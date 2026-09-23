@@ -328,3 +328,15 @@ img { max-width: 100%; }
   .booking-form-layout > form > .form-card:nth-child(3) { order: 4; }
   .booking-form-layout > form > .form-card:nth-child(4) { order: 5; }
 }
+
+/* Elegant crossfade slideshow for the homepage hero. */
+.hero-slides, .hero-slide, .hero-overlay { position: absolute; inset: 0; }
+.hero-slides { overflow: hidden; }
+.hero-slide { background-position: center 52%; background-size: cover; opacity: 0; transform: scale(1.035); transition: opacity 1.4s ease, transform 7s ease; }
+.hero-slide.active { opacity: 1; transform: scale(1); }
+.hero-overlay { z-index: 1; background: linear-gradient(90deg, rgba(12,31,27,.76) 0%, rgba(15,36,30,.55) 39%, rgba(13,32,28,.08) 77%), linear-gradient(0deg, rgba(7,29,25,.38), transparent 30%); pointer-events: none; }
+.hero-dots { position: absolute; z-index: 3; right: 0; bottom: 87px; display: flex; gap: 8px; }
+.hero-dots button { width: 26px; height: 2px; padding: 0; border: 0; background: rgba(255,255,255,.45); cursor: pointer; transition: width .3s ease, background .3s ease; }
+.hero-dots button.active { width: 46px; background: var(--gold-light); }
+@media (max-width: 700px) { .hero-dots { right: 17px; bottom: 29px; } }
+@media (prefers-reduced-motion: reduce) { .hero-slide { transition: opacity .2s ease; transform: none; } }
