@@ -78,6 +78,21 @@ async function bearerToken() {
   return /^bearer\s+/i.test(authorization) ? authorization.replace(/^bearer\s+/i, "").trim() : null;
 }
 
+function previewAdmin() {
+  return {
+    id: 0,
+    fullName: "Administrateur Palacio",
+    email: (process.env.ADMIN_EMAIL || "admin@palaciohotel.com").toLowerCase(),
+    phone: null,
+    country: "",
+    passwordHash: null,
+    role: "admin",
+    locale: "fr",
+    active: true,
+    createdAt: new Date(),
+  };
+}
+
 export async function getCurrentUser() {
   const bearer = await bearerToken();
   const jar = await cookies();
@@ -86,6 +101,7 @@ export async function getCurrentUser() {
   for (const token of candidates) {
     const id = readSessionToken(token);
     if (!id) continue;
+    if (id === 0 && process.env.NODE_ENV === "development" && !process.env.ADMIN_PASSWORD) return previewAdmin();
     try {
       const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
       if (user?.active) return user;
