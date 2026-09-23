@@ -31,7 +31,7 @@ export async function getSettings() {
 export async function getPublicCatalog() {
   try {
     await ensureSeeded();
-    return db.select().from(catalogItems).where(eq(catalogItems.active, true)).orderBy(catalogItems.id);
+    return await db.select().from(catalogItems).where(eq(catalogItems.active, true)).orderBy(catalogItems.id);
   } catch (error) {
     if (process.env.NODE_ENV !== "development") throw error;
     console.warn("[Palacio] Catalog unavailable in development preview.");
