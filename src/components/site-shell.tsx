@@ -15,7 +15,7 @@ export const tr = (locale: string, fr: string, en: string) => locale === "en" ? 
 export const whatsappUrl = (number: string, text: string) => `https://wa.me/${number.replace(/\D/g, "")}?text=${encodeURIComponent(text)}`;
 
 function Brand({ settings, light = false }: { settings: HotelSettings; light?: boolean }) {
-  if (settings.logoUrl) return <span className="brand-with-image"><img src={settings.logoUrl} alt={settings.hotelName} className="brand-image" /></span>;
+  if (settings.logoUrl) return <span className="brand-with-image"><img onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = "/images/palacio-hero.jpg"; }} src={settings.logoUrl} alt={settings.hotelName} className="brand-image" /></span>;
   return <span className={`brand-wordmark ${light ? "brand-light" : ""}`}><span className="brand-mark">✦</span><span className="brand-main">PALACIO</span><span className="brand-small">H O T E L</span></span>;
 }
 
