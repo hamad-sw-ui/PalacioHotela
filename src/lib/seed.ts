@@ -39,7 +39,9 @@ BEGIN
 END $$;`;
 
 async function seed() {
-  try { await db.execute(sql.raw(REPAIR_SETTINGS_SQL)); } catch (error) { console.error("[Palacio] Settings schema repair failed:", error); }
+  try { await db.execute(sql.raw(REPAIR_SETTINGS_SQL)); } catch (error) {
+    if (process.env.NODE_ENV !== "development") console.error("[Palacio] Settings schema repair failed:", error);
+  }
   await db.insert(siteSettings).values({ id: 1 }).onConflictDoNothing();
   const existing = await db.select({ id: catalogItems.id }).from(catalogItems).limit(1);
   if (!existing.length) {
@@ -87,5 +89,13 @@ export async function ensureAdminAccount() {
 export async function ensureSeeded() {
   if (seeded) return;
   if (!pending) pending = seed();
-  try { await pending; seeded = true; } finally { pending = null; }
+  try {
+    await pending;
+    seeded = true;
+  } catch (error) {
+    if (process.env.NODE_ENV !== "development") throw error;
+    // A local preview can render with the safe settings/catalog fallbacks when PostgreSQL
+    // is not running. Production still fails loudly instead of hiding a database outage.
+    seeded = true;
+  } finally { pending = null; }
 }
