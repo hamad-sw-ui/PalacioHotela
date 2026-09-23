@@ -1,6 +1,6 @@
 import { and, eq, gt, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { activityLogs, bookings, catalogItems, notifications, siteSettings, type CatalogItem, type SelectedItem } from "@/db/schema";
+import { activityLogs, bookings, catalogItems, contentPages, notifications, siteSettings, type CatalogItem, type ContentPage, type SelectedItem } from "@/db/schema";
 import { ensureSeeded } from "@/lib/seed";
 import { daysBetween } from "@/lib/format";
 export { daysBetween, formatXaf, validDateRange } from "@/lib/format";
@@ -33,6 +33,22 @@ const previewCatalog: CatalogItem[] = [
   { id: 2, slug: "salon-acacia", category: "conference_room", nameFr: "Salon Acacia", nameEn: "Acacia Conference Room", descriptionFr: "Un espace pour vos réunions.", descriptionEn: "A space for your meetings.", image: "/images/palacio-conference.jpg", price: 350000, pricingUnit: "day", capacity: 60, inventory: 1, amenitiesFr: [], amenitiesEn: [], featured: true, active: true, createdAt: new Date(), updatedAt: new Date() },
   { id: 3, slug: "spa-bien-etre", category: "service", nameFr: "Spa & bien-être", nameEn: "Spa & Wellness", descriptionFr: "Un moment de détente.", descriptionEn: "A moment of relaxation.", image: "/images/palacio-wellness.jpg", price: 45000, pricingUnit: "person", capacity: 2, inventory: 10, amenitiesFr: [], amenitiesEn: [], featured: true, active: true, createdAt: new Date(), updatedAt: new Date() },
 ];
+
+const previewPages: ContentPage[] = [
+  { id: 1, slug: "notre-histoire", titleFr: "L’esprit Palacio", titleEn: "The Palacio spirit", bodyFr: "Bienvenue dans un lieu où l’hospitalité a le sens du détail.\n\nAu cœur de Douala, le Palacio Hotel vous accueille dans un écrin de sérénité.", bodyEn: "Welcome to a place where hospitality lives in the details.\n\nIn the heart of Douala, Palacio Hotel welcomes you into a haven of serenity.", image: "/images/palacio-hero.jpg", published: true, createdAt: new Date(), updatedAt: new Date() },
+  { id: 2, slug: "confidentialite", titleFr: "Politique de confidentialité", titleEn: "Privacy policy", bodyFr: "Vos données personnelles sont utilisées uniquement pour traiter vos demandes de réservation, de devis et vos messages.", bodyEn: "Your personal data is used only to process your booking requests, quote requests and messages.", image: "/images/palacio-hero.jpg", published: true, createdAt: new Date(), updatedAt: new Date() },
+];
+
+export async function getPublicPage(slug: string) {
+  try {
+    await ensureSeeded();
+    const [page] = await db.select().from(contentPages).where(and(eq(contentPages.slug, slug), eq(contentPages.published, true))).limit(1);
+    return page;
+  } catch (error) {
+    if (process.env.NODE_ENV !== "development") throw error;
+    return previewPages.find((page) => page.slug === slug);
+  }
+}
 
 export async function getPublicCatalog() {
   try {
