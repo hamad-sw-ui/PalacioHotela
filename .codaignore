@@ -1,0 +1,82 @@
+# Coda ignore patterns
+# Files and directories matching these patterns will be excluded from
+# indexing, search, and other code analysis features.
+
+# Dependencies
+node_modules/
+vendor/
+.venv/
+venv/
+env/
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+.turbo/
+target/
+
+# Version control
+.git/
+.svn/
+.hg/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Package manager files (lock files are useful, but large)
+# Uncomment if you want to ignore lock files:
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# Large files
+*.zip
+*.tar.gz
+*.gz
+*.rar
+
+# Binary files
+*.exe
+*.dll
+*.so
+*.dylib
+*.wasm
+
+# Media files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.svg
+*.mp3
+*.mp4
+*.wav
+
+# Document files
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
