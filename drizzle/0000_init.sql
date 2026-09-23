@@ -84,6 +84,7 @@ CREATE TABLE "content_pages" (
 );
 --> statement-breakpoint
 CREATE TABLE "notifications" (
+	"user_id" integer,
 	"id" serial PRIMARY KEY NOT NULL,
 	"type" varchar(24) NOT NULL,
 	"title" varchar(200) NOT NULL,
@@ -152,6 +153,7 @@ CREATE TABLE "users" (
 	"full_name" varchar(180) NOT NULL,
 	"email" varchar(255) NOT NULL,
 	"phone" varchar(60),
+	"country" varchar(120) DEFAULT '' NOT NULL,
 	"password_hash" text,
 	"role" varchar(20) DEFAULT 'guest' NOT NULL,
 	"locale" varchar(2) DEFAULT 'fr' NOT NULL,
@@ -159,6 +161,7 @@ CREATE TABLE "users" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "activity_logs" ADD CONSTRAINT "activity_logs_actor_id_users_id_fk" FOREIGN KEY ("actor_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "bookings" ADD CONSTRAINT "bookings_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "bookings" ADD CONSTRAINT "bookings_item_id_catalog_items_id_fk" FOREIGN KEY ("item_id") REFERENCES "public"."catalog_items"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -172,3 +175,4 @@ CREATE UNIQUE INDEX "pages_slug_unique" ON "content_pages" USING btree ("slug");
 CREATE INDEX "quotes_status_idx" ON "quote_requests" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "quotes_email_idx" ON "quote_requests" USING btree ("guest_email");--> statement-breakpoint
 CREATE UNIQUE INDEX "users_email_unique" ON "users" USING btree ("email");
+CREATE INDEX "notifications_user_idx" ON "notifications" USING btree ("user_id","read","created_at");

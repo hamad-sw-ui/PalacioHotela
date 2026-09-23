@@ -8,6 +8,20 @@
       "when": 1790178459157,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790178459158,
+      "tag": "0001_add_user_country",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790178459159,
+      "tag": "0002_client_notifications",
+      "breakpoints": true
     }
   ]
 }

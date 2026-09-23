@@ -16,7 +16,7 @@ export async function GET() {
     db.select().from(quoteRequests).orderBy(desc(quoteRequests.createdAt)).limit(500),
     db.select().from(catalogItems).orderBy(desc(catalogItems.id)),
     db.select().from(contentPages).orderBy(desc(contentPages.id)),
-    db.select({ id: users.id, fullName: users.fullName, email: users.email, phone: users.phone, role: users.role, locale: users.locale, active: users.active, createdAt: users.createdAt }).from(users).orderBy(desc(users.id)).limit(500),
+    db.select({ id: users.id, fullName: users.fullName, email: users.email, phone: users.phone, country: users.country, role: users.role, locale: users.locale, active: users.active, createdAt: users.createdAt }).from(users).orderBy(desc(users.id)).limit(500),
     db.select().from(contactMessages).orderBy(desc(contactMessages.createdAt)).limit(300),
     db.select().from(notifications).orderBy(desc(notifications.createdAt)).limit(100),
     db.select().from(activityLogs).orderBy(desc(activityLogs.createdAt)).limit(300),

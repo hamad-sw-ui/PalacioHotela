@@ -4,7 +4,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { bookings, catalogItems, contactMessages, contentPages, notifications, quoteRequests, siteSettings, users, type SelectedItem } from "@/db/schema";
 import { getAdminForMutation, hashPassword } from "@/lib/auth";
-import { bookingTotal, getSettings, logActivity, remainingAvailability, validDateRange } from "@/lib/hotel";
+import { bookingTotal, getSettings, logActivity, notifyUser, remainingAvailability, validDateRange } from "@/lib/hotel";
 import { sendBookingEmails, sendQuoteSentEmail, sendStatusEmail } from "@/lib/mail";
 import { buildQuotePdf } from "@/lib/pdf-quote";
 import { bookingInput, contactInput, parseError, quoteInput } from "@/lib/validation";
@@ -13,7 +13,7 @@ const image = z.string().max(2000).refine((s) => !s || s.startsWith("/") || s.st
 const catalogSchema = z.object({ slug: z.string().min(2).max(200).regex(/^[a-z0-9-]+$/), category: z.enum(["accommodation", "conference_room", "event_hall", "service", "restaurant"]), nameFr: z.string().min(2).max(200), nameEn: z.string().min(2).max(200), descriptionFr: z.string().max(4000), descriptionEn: z.string().max(4000), image, price: z.coerce.number().int().min(0).max(1000000000), pricingUnit: z.enum(["night", "day", "person", "service"]), capacity: z.coerce.number().int().min(1).max(10000), inventory: z.coerce.number().int().min(0).max(10000), amenitiesFr: z.array(z.string().max(100)).max(30), amenitiesEn: z.array(z.string().max(100)).max(30), featured: z.boolean(), active: z.boolean() }).strict();
 const pageSchema = z.object({ slug: z.string().min(2).max(160).regex(/^[a-z0-9-]+$/), titleFr: z.string().min(2).max(200), titleEn: z.string().min(2).max(200), bodyFr: z.string().max(30000), bodyEn: z.string().max(30000), image, published: z.boolean() }).strict();
 const settingsSchema = z.object({ hotelName: z.string().min(2).max(180), logoUrl: image, heroImage: image, heroTitleFr: z.string().min(3).max(300), heroTitleEn: z.string().min(3).max(300), heroSubtitleFr: z.string().max(1000), heroSubtitleEn: z.string().max(1000), aboutFr: z.string().max(5000), aboutEn: z.string().max(5000), aboutImage: image, theme: z.enum(["forest", "midnight", "terracotta"]), email: z.email(), phone: z.string().min(6).max(60), whatsapp: z.string().min(8).max(60), addressFr: z.string().max(500), addressEn: z.string().max(500), latitude: z.coerce.number().min(-90).max(90), longitude: z.coerce.number().min(-180).max(180), acceptingQuotes: z.boolean(), aiProvider: z.enum(["auto", "openai", "ollama", "local"]), aiBaseUrl: z.string().max(500), aiModel: z.string().max(120) }).strict();
-const userSchema = z.object({ fullName: z.string().trim().min(2).max(180), email: z.email().transform((v) => v.toLowerCase()), phone: z.string().max(60).nullable(), role: z.enum(["admin", "staff", "guest"]), locale: z.enum(["fr", "en"]), active: z.boolean(), password: z.string().min(8).max(200).optional() }).strict();
+const userSchema = z.object({ fullName: z.string().trim().min(2).max(180), email: z.email().transform((v) => v.toLowerCase()), country: z.string().trim().min(2).max(120).optional(), phone: z.string().max(60).nullable(), role: z.enum(["admin", "staff", "guest"]), locale: z.enum(["fr", "en"]), active: z.boolean(), password: z.string().min(8).max(200).optional() }).strict();
 const quoteSchema = z.object({ guestName: z.string().min(2).max(180), guestEmail: z.email(), guestPhone: z.string().min(6).max(60), company: z.string().max(180).nullable(), locale: z.enum(["fr", "en"]), requestKind: z.enum(["accommodation", "conference_room", "event_hall", "service", "restaurant", "mixed"]), checkIn: z.string().nullable(), checkOut: z.string().nullable(), people: z.coerce.number().int().min(1).max(10000), message: z.string().max(4000), budget: z.coerce.number().int().min(0).nullable(), amountTtc: z.coerce.number().int().min(0).nullable(), validUntil: z.string().nullable(), status: z.enum(["new", "in_review", "quote_sent", "negotiating", "accepted", "rejected", "expired"]), adminNotes: z.string().max(4000), selectedItems: z.array(z.object({ property_id: z.coerce.number().int().positive(), type: z.enum(["accommodation", "conference_room", "event_hall", "service", "restaurant"]), name_fr: z.string().max(200), name_en: z.string().max(200), price: z.coerce.number().int().min(0), quantity: z.coerce.number().int().min(1), nights: z.coerce.number().int().min(1).optional(), check_in: z.string().optional(), check_out: z.string().optional(), dates: z.array(z.string()).optional(), meal_types: z.array(z.string()).optional(), source: z.string().optional() }).passthrough()).max(30) }).strict();
 const bookingSchema = z.object({ guestName: z.string().min(2).max(180), guestEmail: z.email(), guestPhone: z.string().min(6).max(60), locale: z.enum(["fr", "en"]), itemId: z.coerce.number().int().positive(), checkIn: z.string(), checkOut: z.string(), guests: z.coerce.number().int().min(1).max(10000), quantity: z.coerce.number().int().min(1).max(100), notes: z.string().max(4000), status: z.enum(["pending", "confirmed", "checked_in", "checked_out", "cancelled"]), paymentStatus: z.enum(["unpaid", "awaiting_payment", "pay_on_site", "paid", "refunded"]), paymentMethod: z.enum(["cash", "card", "paypal"]) }).strict();
 
@@ -43,9 +43,9 @@ async function manageUsers(action: string, id: number, data: Record<string, unkn
     await db.delete(users).where(eq(users.id, id)); return {};
   }
   if (action === "create") {
-    const parsed = userSchema.parse({ phone: null, active: true, locale: "fr", role: "guest", ...data });
+    const parsed = userSchema.parse({ country: "Non renseigné", phone: null, active: true, locale: "fr", role: "guest", ...data });
     if (!parsed.password) throw new Error("Un mot de passe d'au moins 8 caractères est requis.");
-    const [record] = await db.insert(users).values({ fullName: parsed.fullName, email: parsed.email, phone: parsed.phone, role: parsed.role, locale: parsed.locale, active: parsed.active, passwordHash: hashPassword(parsed.password) }).returning();
+    const [record] = await db.insert(users).values({ fullName: parsed.fullName, email: parsed.email, country: parsed.country, phone: parsed.phone, role: parsed.role, locale: parsed.locale, active: parsed.active, passwordHash: hashPassword(parsed.password) }).returning();
     return { id: record.id, email: record.email };
   }
   const parsed = userSchema.partial().parse(data);
@@ -84,7 +84,10 @@ async function manageBookings(action: string, id: number, data: Record<string, u
     if (quantity > free) throw new Error("Disponibilité insuffisante.");
   }
   const [record] = await db.update(bookings).set({ ...parsed, itemName: (parsed.locale || current.locale) === "en" ? item.nameEn : item.nameFr, total: bookingTotal(item, start, end, quantity), updatedAt: new Date() }).where(eq(bookings.id, id)).returning();
-  if (parsed.status && parsed.status !== current.status && ["confirmed", "cancelled"].includes(parsed.status)) await sendStatusEmail(record.guestEmail, record.guestName, record.reference || "", parsed.status, "booking", record.locale, await getSettings());
+  if (parsed.status && parsed.status !== current.status && ["confirmed", "cancelled"].includes(parsed.status)) {
+    await sendStatusEmail(record.guestEmail, record.guestName, record.reference || "", parsed.status, "booking", record.locale, await getSettings());
+    await notifyUser(record.userId, "booking", parsed.status === "confirmed" ? "Votre réservation est confirmée" : "Votre réservation a été annulée", record.reference || "", `/reservation/confirmation?token=${record.publicToken}`);
+  }
   return record;
 }
 
@@ -112,12 +115,17 @@ async function manageQuotes(action: string, id: number, data: Record<string, unk
     const settings = await getSettings();
     const pdf = await buildQuotePdf(record, settings, "quote");
     const emailSent = await sendQuoteSentEmail(record, settings, pdf, `${origin}/devis/suivi?token=${record.publicToken}`);
+    await notifyUser(record.userId, "quote", "Votre devis personnalisé est disponible", record.reference || "", `/devis/suivi?token=${record.publicToken}`);
     return { ...record, emailSent };
   }
   const parsed = quoteSchema.partial().parse(data);
   if (parsed.status === "quote_sent") throw new Error("Utilisez l'action Envoyer le devis pour notifier le client.");
   const [record] = await db.update(quoteRequests).set({ ...parsed, ...(parsed.selectedItems ? { selectedItems: parsed.selectedItems as SelectedItem[] } : {}), updatedAt: new Date() }).where(eq(quoteRequests.id, id)).returning();
-  if (parsed.status && parsed.status !== current.status && ["accepted", "rejected", "negotiating", "expired"].includes(parsed.status)) await sendStatusEmail(record.guestEmail, record.guestName, record.reference || "", parsed.status, "quote", record.locale, await getSettings());
+  if (parsed.status && parsed.status !== current.status && ["accepted", "rejected", "negotiating", "expired"].includes(parsed.status)) {
+    await sendStatusEmail(record.guestEmail, record.guestName, record.reference || "", parsed.status, "quote", record.locale, await getSettings());
+    const titles: Record<string, string> = { accepted: "Votre devis a été accepté", rejected: "Votre devis a été refusé", negotiating: "Votre devis est en discussion", expired: "Votre devis a expiré" };
+    await notifyUser(record.userId, "quote", titles[parsed.status] || "Mise à jour de votre devis", record.reference || "", `/devis/suivi?token=${record.publicToken}`);
+  }
   return record;
 }
 

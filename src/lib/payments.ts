@@ -3,7 +3,7 @@ import type { Booking } from "@/db/schema";
 
 export function paymentConfiguration() {
   const rate = Number(process.env.PAYPAL_XAF_PER_EUR || "0");
-  return { card: Boolean(process.env.STRIPE_SECRET_KEY), paypal: Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET && rate > 0), cash: true, paypalRate: rate > 0 ? rate : null };
+  return { card: Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET), paypal: Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET && rate > 0), cash: true, paypalRate: rate > 0 ? rate : null };
 }
 
 export function stripeClient() {

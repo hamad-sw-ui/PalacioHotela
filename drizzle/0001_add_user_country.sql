@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "country" varchar(120) DEFAULT '' NOT NULL;

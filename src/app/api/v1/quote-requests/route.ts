@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { quoteRequests, type SelectedItem } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
-import { getPublicCatalog, getSettings, logActivity, notifyAdmin, remainingAvailability, validDateRange } from "@/lib/hotel";
+import { getPublicCatalog, getSettings, logActivity, notifyAdmin, notifyUser, remainingAvailability, validDateRange } from "@/lib/hotel";
 import { sendQuoteReceivedEmails } from "@/lib/mail";
 import { buildQuotePdf } from "@/lib/pdf-quote";
 import { parseError, quoteInput } from "@/lib/validation";
@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     const settings = await getSettings();
     const pdf = await buildQuotePdf(quote, settings, "receipt");
     await notifyAdmin("quote", `Nouveau devis ${reference}`, `${input.guestName} · ${input.requestKind}`, "/admin?section=devis");
+    await notifyUser(quote.userId, "quote", "Votre demande de devis a bien été reçue", reference, `/devis/suivi?token=${quote.publicToken}`);
     await logActivity("Demande de devis", "quote", quote.id, input.guestName, user?.id || null, reference);
     await sendQuoteReceivedEmails(quote, settings, pdf);
     return Response.json({ ok: true, reference, token: quote.publicToken, pdfUrl: `/api/quotes/${quote.publicToken}/pdf?kind=receipt` }, { status: 201 });
