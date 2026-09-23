@@ -86,8 +86,14 @@ export async function getCurrentUser() {
   for (const token of candidates) {
     const id = readSessionToken(token);
     if (!id) continue;
-    const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
-    if (user?.active) return user;
+    try {
+      const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+      if (user?.active) return user;
+    } catch (error) {
+      if (process.env.NODE_ENV !== "development") throw error;
+      console.warn("[Palacio] Database unavailable in development; treating the session as signed out.");
+      return null;
+    }
   }
   return null;
 }
