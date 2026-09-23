@@ -28,14 +28,20 @@ export async function getSettings() {
   }
 }
 
+const previewCatalog: CatalogItem[] = [
+  { id: 1, slug: "chambre-deluxe", category: "accommodation", nameFr: "Chambre Deluxe", nameEn: "Deluxe Room", descriptionFr: "Une chambre élégante et confortable.", descriptionEn: "An elegant and comfortable room.", image: "/images/palacio-suite.jpg", price: 95000, pricingUnit: "night", capacity: 2, inventory: 8, amenitiesFr: [], amenitiesEn: [], featured: true, active: true, createdAt: new Date(), updatedAt: new Date() },
+  { id: 2, slug: "salon-acacia", category: "conference_room", nameFr: "Salon Acacia", nameEn: "Acacia Conference Room", descriptionFr: "Un espace pour vos réunions.", descriptionEn: "A space for your meetings.", image: "/images/palacio-conference.jpg", price: 350000, pricingUnit: "day", capacity: 60, inventory: 1, amenitiesFr: [], amenitiesEn: [], featured: true, active: true, createdAt: new Date(), updatedAt: new Date() },
+  { id: 3, slug: "spa-bien-etre", category: "service", nameFr: "Spa & bien-être", nameEn: "Spa & Wellness", descriptionFr: "Un moment de détente.", descriptionEn: "A moment of relaxation.", image: "/images/palacio-wellness.jpg", price: 45000, pricingUnit: "person", capacity: 2, inventory: 10, amenitiesFr: [], amenitiesEn: [], featured: true, active: true, createdAt: new Date(), updatedAt: new Date() },
+];
+
 export async function getPublicCatalog() {
   try {
     await ensureSeeded();
     return await db.select().from(catalogItems).where(eq(catalogItems.active, true)).orderBy(catalogItems.id);
   } catch (error) {
     if (process.env.NODE_ENV !== "development") throw error;
-    console.warn("[Palacio] Catalog unavailable in development preview.");
-    return [];
+    console.warn("[Palacio] Catalog unavailable in development preview; using preview catalog.");
+    return previewCatalog;
   }
 }
 
