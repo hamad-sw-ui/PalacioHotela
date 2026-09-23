@@ -12,7 +12,7 @@ type View = "checking" | "login" | "app";
  * Decides between the sign-in screen and the backoffice in the browser, so access does not
  * depend on a cookie reaching the server (cookies are often refused when the site is embedded).
  */
-export function AdminGate({ initialAuthenticated, demo, demoEmail }: { initialAuthenticated: boolean; demo: boolean; demoEmail: string }) {
+export function AdminGate({ initialAuthenticated, demo, demoEmail, supportEmail, hotelAddress }: { initialAuthenticated: boolean; demo: boolean; demoEmail: string; supportEmail: string; hotelAddress: string }) {
   const [view, setView] = useState<View>(initialAuthenticated ? "app" : "checking");
 
   useEffect(() => {
@@ -30,6 +30,6 @@ export function AdminGate({ initialAuthenticated, demo, demoEmail }: { initialAu
   const signedIn = useCallback(() => setView("app"), []);
 
   if (view === "checking") return <div className="admin-loading"><Loader2 className="spin" size={34}/><span>PALACIO BACKOFFICE</span></div>;
-  if (view === "login") return <AdminLogin demo={demo} demoEmail={demoEmail} onSuccess={signedIn}/>;
+  if (view === "login") return <AdminLogin demo={demo} demoEmail={demoEmail} supportEmail={supportEmail} hotelAddress={hotelAddress} onSuccess={signedIn}/>;
   return <AdminApp onSignedOut={signedOut}/>;
 }

@@ -26,13 +26,15 @@ export async function POST(request: Request) {
     if (body?.action === "logout") { await clearSession(); return Response.json({ ok: true }, { headers: noStore }); }
     await ensureSeeded();
     await ensureAdminAccount();
-    const parsed = z.object({ action: z.enum(["login", "register"]), email: emailField, password: z.string().min(1).max(200), fullName: z.string().trim().min(2).max(180).optional(), phone: z.string().trim().max(60).optional(), locale: z.enum(["fr", "en"]).optional() }).parse(body);
+    const parsed = z.object({ action: z.enum(["login", "register"]), email: emailField, password: z.string().min(1).max(200), fullName: z.string().trim().min(2).max(180).optional(), phone: z.string().trim().min(6).max(60).optional(), country: z.string().trim().min(2).max(120).optional(), locale: z.enum(["fr", "en"]).optional() }).parse(body);
     if (parsed.action === "register") {
       if (!parsed.fullName) return Response.json({ error: "Le nom est requis." }, { status: 400 });
+      if (!parsed.country) return Response.json({ error: "Le pays est requis." }, { status: 400 });
+      if (!parsed.phone) return Response.json({ error: "Le numéro de téléphone est requis." }, { status: 400 });
       if (parsed.password.length < 8) return Response.json({ error: "Le mot de passe doit contenir au moins 8 caractères." }, { status: 400 });
       const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, parsed.email)).limit(1);
       if (existing) return Response.json({ error: "Un compte existe déjà avec cet e-mail." }, { status: 409 });
-      const [user] = await db.insert(users).values({ fullName: parsed.fullName, email: parsed.email, phone: parsed.phone, passwordHash: hashPassword(parsed.password), role: "guest", locale: parsed.locale || "fr" }).returning();
+      const [user] = await db.insert(users).values({ fullName: parsed.fullName, email: parsed.email, phone: parsed.phone, country: parsed.country, passwordHash: hashPassword(parsed.password), role: "guest", locale: parsed.locale || "fr" }).returning();
       const token = await setSession(user.id);
       await logActivity("Création de compte", "user", user.id, user.fullName, user.id);
       return Response.json({ ok: true, token, user: publicUser(user) }, { headers: noStore });

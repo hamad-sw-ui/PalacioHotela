@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { bookings } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
-import { bookingTotal, getPublicCatalog, getSettings, logActivity, notifyAdmin, remainingAvailability, validDateRange } from "@/lib/hotel";
+import { bookingTotal, getPublicCatalog, getSettings, logActivity, notifyAdmin, notifyUser, remainingAvailability, validDateRange } from "@/lib/hotel";
 import { sendBookingEmails } from "@/lib/mail";
 import { createPayPalOrder, createStripeCheckout, paymentConfiguration } from "@/lib/payments";
 import { bookingInput, parseError } from "@/lib/validation";
@@ -39,6 +39,7 @@ export async function POST(request: Request) {
     }
     const settings = await getSettings();
     await notifyAdmin("booking", `Nouvelle réservation ${reference}`, `${input.guestName} · ${item.nameFr} · ${input.checkIn}`, "/admin?section=reservations");
+    await notifyUser(booking.userId, "booking", "Votre demande de réservation a bien été reçue", `${reference} · ${item.nameFr}`, `/reservation/confirmation?token=${booking.publicToken}`);
     await logActivity("Création de réservation", "booking", booking.id, input.guestName, user?.id || null, reference);
     await sendBookingEmails(booking, settings);
     return Response.json({ ok: true, reference, token, redirectUrl, paymentError, total, status: booking.status }, { status: 201 });

@@ -21,6 +21,7 @@ export const users = pgTable("users", {
   fullName: varchar("full_name", { length: 180 }).notNull(),
   email: varchar("email", { length: 255 }).notNull(),
   phone: varchar("phone", { length: 60 }),
+  country: varchar("country", { length: 120 }).notNull().default(""),
   passwordHash: text("password_hash"),
   role: varchar("role", { length: 20 }).notNull().default("guest"),
   locale: varchar("locale", { length: 2 }).notNull().default("fr"),
@@ -154,13 +155,14 @@ export const contactMessages = pgTable("contact_messages", {
 
 export const notifications = pgTable("notifications", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
   type: varchar("type", { length: 24 }).notNull(),
   title: varchar("title", { length: 200 }).notNull(),
   message: text("message").notNull(),
   href: text("href").notNull().default("/admin"),
   read: boolean("read").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [index("notifications_user_idx").on(t.userId, t.read, t.createdAt)]);
 
 export const activityLogs = pgTable("activity_logs", {
   id: serial("id").primaryKey(),

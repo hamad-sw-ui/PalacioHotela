@@ -6,14 +6,37 @@ import { daysBetween } from "@/lib/format";
 export { daysBetween, formatXaf, validDateRange } from "@/lib/format";
 
 export async function getSettings() {
-  await ensureSeeded();
-  const [settings] = await db.select().from(siteSettings).where(eq(siteSettings.id, 1));
-  return settings;
+  try {
+    await ensureSeeded();
+    const [settings] = await db.select().from(siteSettings).where(eq(siteSettings.id, 1));
+    return settings;
+  } catch (error) {
+    // Keep the public shell viewable during local UI work when PostgreSQL is not running.
+    // Mutating APIs still fail normally and production keeps the database as a requirement.
+    if (process.env.NODE_ENV !== "development") throw error;
+    console.warn("[Palacio] Database unavailable in development; using preview settings.");
+    return {
+      id: 1, hotelName: "Palacio Hotel", logoUrl: "", heroImage: "/images/palacio-hero.jpg",
+      heroTitleFr: "Un séjour d’exception, à votre image.", heroTitleEn: "An exceptional stay, made for you.",
+      heroSubtitleFr: "Au cœur de Douala, découvrez une adresse où l’élégance rencontre la chaleur de l’hospitalité.",
+      heroSubtitleEn: "In the heart of Douala, discover a place where elegance meets the warmth of hospitality.",
+      aboutFr: "Plus qu’un hôtel, une destination.", aboutEn: "More than a hotel, a destination.", aboutImage: "/images/palacio-dining.jpg",
+      theme: "forest", email: "bonjour@palaciohotel.com", phone: "+237 6 99 00 00 00", whatsapp: "237699000000",
+      addressFr: "Bonanjo, Douala, Cameroun", addressEn: "Bonanjo, Douala, Cameroon", latitude: 4.0511, longitude: 9.7679,
+      acceptingQuotes: true, aiProvider: "auto", aiBaseUrl: "", aiModel: "", updatedAt: new Date(),
+    };
+  }
 }
 
 export async function getPublicCatalog() {
-  await ensureSeeded();
-  return db.select().from(catalogItems).where(eq(catalogItems.active, true)).orderBy(catalogItems.id);
+  try {
+    await ensureSeeded();
+    return db.select().from(catalogItems).where(eq(catalogItems.active, true)).orderBy(catalogItems.id);
+  } catch (error) {
+    if (process.env.NODE_ENV !== "development") throw error;
+    console.warn("[Palacio] Catalog unavailable in development preview.");
+    return [];
+  }
 }
 
 export function bookingTotal(item: CatalogItem, start: string, end: string, quantity: number) {
@@ -38,4 +61,9 @@ export async function logActivity(action: string, entity: string, entityId: numb
 
 export async function notifyAdmin(type: string, title: string, message: string, href: string) {
   await db.insert(notifications).values({ type, title, message, href });
+}
+
+export async function notifyUser(userId: number | null | undefined, type: string, title: string, message: string, href: string) {
+  if (!userId) return;
+  await db.insert(notifications).values({ userId, type, title, message, href });
 }
