@@ -335,6 +335,18 @@
 .admin-search input { width:100%; border:0; outline:0; font-size:11px; background:transparent; }
 .admin-list-toolbar select { border:1px solid #e1e9df; background:#fff; color:#556b57; height:43px; padding:0 13px; font-size:11px; }
 .admin-export { display:flex; align-items:center; gap:8px; border:1px solid #e1e9df; background:#fff; color:#526b56; height:43px; padding:0 13px; font-size:10px; font-weight:700; white-space:nowrap; }
+.admin-checkbox { width:16px; height:16px; margin:0; accent-color:#1b4a32; cursor:pointer; }
+.admin-select-cell { width:44px; padding-left:15px!important; padding-right:8px!important; text-align:center; }
+.admin-bulk-toolbar { display:flex; align-items:center; gap:12px; margin:0 0 16px; padding:12px 15px; border:1px solid #dfe9df; background:#f4f8f2; color:#4d684f; font-size:11px; }
+.admin-bulk-toolbar > div { margin-right:auto; }
+.admin-bulk-toolbar select { min-width:190px; height:37px; border:1px solid #d7e3d5; background:#fff; color:#456148; padding:0 10px; font-size:10px; }
+.admin-bulk-toolbar .btn { min-height:37px; padding:0 15px; font-size:10px; }
+.admin-bulk-toolbar .admin-secondary-button { height:37px; }
+.admin-grid-selection { display:flex; align-items:center; gap:9px; margin:0 0 12px; color:#748675; font-size:10px; }
+.admin-row-actions { display:flex; align-items:center; gap:2px; }
+.admin-row-action { border:0; background:none; color:#86988b; padding:7px; cursor:pointer; }
+.admin-row-action:hover { color:#a27846; background:#f3f6f1; }
+.admin-row-action.danger:hover { color:#9b4c42; background:#fcf1ef; }
 .admin-table-wrap { background:#fff; border:1px solid #e7ece5; overflow-x:auto; }
 .admin-table { width:100%; border-collapse:collapse; text-align:left; }
 .admin-table th { background:#f9faf7; color:#89998b; padding:15px 17px; border-bottom:1px solid #e7ece5; font-size:9px; letter-spacing:.075em; white-space:nowrap; }
@@ -358,6 +370,7 @@
 .admin-catalog-card { background:#fff; border:1px solid #e4ebe3; overflow:hidden; }
 .admin-catalog-photo { height:177px; position:relative; }
 .admin-catalog-photo img { width:100%; height:100%; object-fit:cover; }
+.admin-catalog-photo > .admin-checkbox { position:absolute; z-index:1; top:12px; left:12px; }
 .admin-catalog-photo .status-pill { position:absolute; top:11px; right:11px; }
 .admin-catalog-body { padding:18px; }
 .admin-catalog-body > small { color:#aa8758; font-size:9px; text-transform:uppercase; letter-spacing:.1em; }
@@ -368,6 +381,7 @@
 .admin-catalog-body button { color:#a27846; }
 .admin-notifications-page { background:#fff; border:1px solid #e8ede6; }
 .admin-notif-toolbar { padding:16px 22px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e7ece5; font-size:11px; color:#94a194; }
+.admin-notif-select { display:flex; align-items:center; gap:9px; margin-right:auto; color:#748675; font-size:10px; }
 .admin-notif-item { display:flex; align-items:center; gap:15px; padding:19px 22px; border-bottom:1px solid #edf0e9; }
 .admin-notif-item.unread { background:#f9fbf6; }
 .admin-notif-icon { width:39px; height:39px; flex:none; display:grid; place-items:center; color:#a98553; background:#f5f1e7; }
