@@ -76,13 +76,18 @@ async function seed() {
 export async function ensureAdminAccount() {
   const adminEmail = (process.env.ADMIN_EMAIL || "admin@palaciohotel.com").toLowerCase();
   const adminPassword = process.env.ADMIN_PASSWORD || "Palacio2026!";
-  const [existingAdmin] = await db.select().from(users).where(eq(users.email, adminEmail)).limit(1);
-  if (!existingAdmin) {
-    await db.insert(users).values({ fullName: "Administrateur Palacio", email: adminEmail, passwordHash: hashPassword(adminPassword), role: "admin" }).onConflictDoNothing();
-    return;
-  }
-  if (!existingAdmin.active || existingAdmin.role === "guest" || !verifyPassword(adminPassword, existingAdmin.passwordHash)) {
-    await db.update(users).set({ active: true, role: "admin", passwordHash: hashPassword(adminPassword) }).where(eq(users.id, existingAdmin.id));
+  try {
+    const [existingAdmin] = await db.select().from(users).where(eq(users.email, adminEmail)).limit(1);
+    if (!existingAdmin) {
+      await db.insert(users).values({ fullName: "Administrateur Palacio", email: adminEmail, passwordHash: hashPassword(adminPassword), role: "admin" }).onConflictDoNothing();
+      return;
+    }
+    if (!existingAdmin.active || existingAdmin.role === "guest" || !verifyPassword(adminPassword, existingAdmin.passwordHash)) {
+      await db.update(users).set({ active: true, role: "admin", passwordHash: hashPassword(adminPassword) }).where(eq(users.id, existingAdmin.id));
+    }
+  } catch (error) {
+    if (process.env.NODE_ENV !== "development") throw error;
+    console.warn("[Palacio] Database unavailable in development; skipping admin account repair.");
   }
 }
 
