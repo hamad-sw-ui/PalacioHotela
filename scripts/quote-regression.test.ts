@@ -3,7 +3,14 @@ import { test } from "node:test";
 import { PDFDocument } from "pdf-lib";
 import { quoteLineTotal, quoteTotal, restaurantLineIdentity } from "@/lib/quote-pricing";
 import { buildQuotePdfV2 } from "@/lib/pdf-quote-v2";
+import { buildQuotePdfV3 } from "@/lib/pdf-quote-v3";
 import { analyzeQuoteMessage } from "@/lib/ai-provider";
+import { enrichQuoteItems } from "@/lib/quote-items";
+import { buildQuoteDocumentModel } from "@/lib/quote-document-model";
+import { quoteInput } from "@/lib/validation";
+import { quoteVisibleToAccount } from "@/lib/quote-account";
+import { containInBox } from "@/lib/pdf-image-fit";
+import { decodeSignature } from "@/lib/signature-file";
 import type { CatalogItem, HotelSettings, QuoteRequest, SelectedItem } from "@/db/schema";
 
 const restaurant = (overrides: Partial<SelectedItem> = {}): SelectedItem => ({
@@ -67,4 +74,108 @@ test("local quote assistant turns natural language into catalog-backed lines", a
   assert.ok(result.lines.some((line) => line.category === "conference_room"));
   assert.ok(result.lines.some((line) => line.category === "restaurant" && line.mealTypes?.includes("lunch") && line.mealTypes.includes("dinner")));
   assert.ok(result.lines.every((line) => line.catalogItemId));
+});
+
+test("quote validation accepts a HH:MM time and all five meal types", () => {
+  const parsed = quoteInput.parse({
+    guestName: "Client Test",
+    guestEmail: "client@example.com",
+    guestPhone: "+237600000000",
+    requestKind: "restaurant",
+    selectedItems: [{
+      property_id: 3,
+      quantity: 1,
+      order_time: "13:00",
+      order_dates: ["2027-01-10"],
+      meal_types: ["breakfast", "lunch", "dinner", "snacks", "other"],
+    }],
+    checkIn: "2027-01-10",
+    checkOut: "2027-01-12",
+    people: 2,
+    message: "Demande de restauration complète.",
+  });
+  assert.equal(parsed.selectedItems[0].order_time, "13:00");
+  assert.equal(parsed.selectedItems[0].meal_types?.length, 5);
+});
+
+test("quote validation keeps the project description optional", () => {
+  const parsed = quoteInput.parse({
+    guestName: "Client Test",
+    guestEmail: "client@example.com",
+    guestPhone: "+237600000000",
+    requestKind: "accommodation",
+    selectedItems: [{ property_id: 1, quantity: 1 }],
+    checkIn: "2027-01-10",
+    checkOut: "2027-01-12",
+    people: 2,
+  });
+  assert.equal(parsed.message, "");
+});
+
+test("a quote reaches the matching client account and stays private otherwise", () => {
+  const user = { id: 4, email: "Client@Example.com" };
+  assert.equal(quoteVisibleToAccount({ userId: 4, guestEmail: "other@example.com" }, user), true);
+  assert.equal(quoteVisibleToAccount({ userId: null, guestEmail: "client@example.com" }, user), true);
+  assert.equal(quoteVisibleToAccount({ userId: 9, guestEmail: "client@example.com" }, user), false);
+  assert.equal(quoteVisibleToAccount({ userId: null, guestEmail: "guest@example.com" }, user), false);
+});
+
+test("a digital signature is accepted only as a real PNG or JPEG", () => {
+  const png = Buffer.concat([Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64"), Buffer.alloc(80)]);
+  assert.equal(decodeSignature(`data:image/png;base64,${png.toString("base64")}`).extension, "png");
+  assert.throws(() => decodeSignature("data:image/webp;base64,AAAA"), /PNG ou JPEG/);
+});
+
+test("a stamp keeps the same place and stays fully visible at any resolution", () => {
+  const box = { x: 475, y: 80, width: 72, height: 72 };
+  const large = containInBox({ width: 1024, height: 1024 }, box);
+  const small = containInBox({ width: 64, height: 64 }, box);
+  const wide = containInBox({ width: 2000, height: 400 }, box);
+  assert.deepEqual(large, small);
+  assert.equal(large.x, box.x);
+  assert.equal(large.y, box.y);
+  assert.equal(large.width, box.width);
+  assert.ok(wide.width <= box.width && wide.height <= box.height);
+  assert.ok(wide.x >= box.x && wide.y >= box.y);
+  assert.ok(wide.x + wide.width <= box.x + box.width + 0.01);
+  assert.ok(wide.y + wide.height <= box.y + box.height + 0.01);
+  assert.equal(wide.width, box.width);
+});
+
+test("catalog enrichment normalizes and merges identical restaurant configurations", () => {
+  const dining = catalog({ id: 3, category: "restaurant", nameFr: "La Table", nameEn: "Dining", slug: "table", pricingUnit: "person", price: 5000 });
+  const lines = enrichQuoteItems([
+    { property_id: 3, quantity: 1, order_dates: ["2027-01-11", "2027-01-10"], meal_types: ["Dinner", "lunch"], order_time: "13:00" },
+    { property_id: 3, quantity: 2, order_dates: ["2027-01-10", "2027-01-11"], meal_types: ["lunch", "dinner"], order_time: "13:00" },
+  ], [dining], { source: "web" });
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0].quantity, 3);
+  assert.deepEqual(lines[0].meal_types, ["dinner", "lunch"]);
+  assert.equal(quoteTotal(lines), 60000);
+});
+
+test("PDF v3 uses the normalized document model in every platform theme", async () => {
+  const request = { ...quote([restaurant()]), pdfTemplateVersion: 3, amountTtc: 42000, validUntil: "2027-02-01", adminSignerRole: "Direction" };
+  for (const theme of ["forest", "midnight", "terracotta"] as const) {
+    const themedSettings = { ...settings, theme };
+    const model = buildQuoteDocumentModel(request, themedSettings, "quote");
+    assert.equal(model.total, 42000);
+    assert.equal(model.lines[0].total, 40000);
+    assert.equal(model.signatures.adminRole, "Direction");
+    const bytes = await buildQuotePdfV3(request, themedSettings, "quote");
+    const document = await PDFDocument.load(bytes);
+    assert.ok(bytes.byteLength > 1000);
+    assert.equal(document.getPages()[0].getSize().width, 595);
+    assert.equal(document.getPages()[0].getSize().height, 842);
+  }
+});
+
+test("PDF v3 receipt and long quote remain valid paginated A4 documents", async () => {
+  const items = Array.from({ length: 24 }, (_, index) => restaurant({ property_id: index + 1, name_fr: `Prestation ${index + 1}`, name_en: `Item ${index + 1}` }));
+  const request = { ...quote(items), pdfTemplateVersion: 3 };
+  const receipt = await PDFDocument.load(await buildQuotePdfV3(request, settings, "receipt"));
+  const commercial = await PDFDocument.load(await buildQuotePdfV3(request, settings, "quote"));
+  assert.ok(receipt.getPages().length > 1);
+  assert.ok(commercial.getPages().length > 1);
+  assert.ok(commercial.getPages().every((page) => page.getSize().width === 595 && page.getSize().height === 842));
 });

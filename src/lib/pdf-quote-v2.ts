@@ -5,6 +5,9 @@ import type { HotelSettings, QuoteRequest, SelectedItem } from "@/db/schema";
 import { formatXaf } from "@/lib/format";
 import { quoteLineTotal, quoteTotal } from "@/lib/quote-pricing";
 import { formatQuoteLineMeta, formatQuoteLineMeals } from "@/lib/quote-line-display";
+import { containInBox } from "@/lib/pdf-image-fit";
+import { buildQuoteDocumentModel } from "@/lib/quote-document-model";
+import { getQuotePdfPalette } from "@/lib/quote-pdf-theme";
 
 const clean = (value: unknown) => String(value ?? "").replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/[\u2013\u2014]/g, "-").replace(/\u0153/g, "oe").replace(/[^\x20-\xFF]/g, " ");
 
@@ -17,11 +20,7 @@ function hex(value: string) {
 }
 
 function palette(theme: string): Palette {
-  const values = theme === "midnight"
-    ? { primary: "#1b303c", dark: "#11242e", accent: "#bf9a68", accentLight: "#dfbe89", ink: "#203744", muted: "#5d6879", paper: "#f7f8f8", soft: "#f0f3f3", border: "#d9e0e0" }
-    : theme === "terracotta"
-      ? { primary: "#6d3f31", dark: "#512c23", accent: "#c88860", accentLight: "#e2b184", ink: "#533d32", muted: "#76615a", paper: "#fbf8f5", soft: "#f7f0e9", border: "#eaded5" }
-      : { primary: "#18382e", dark: "#102d26", accent: "#c09a63", accentLight: "#e0bd83", ink: "#20392f", muted: "#6e786f", paper: "#faf9f5", soft: "#f3f2ed", border: "#dfe6dd" };
+  const values = getQuotePdfPalette(theme);
   return Object.fromEntries(Object.entries(values).map(([key, value]) => [key, hex(value)])) as Palette;
 }
 
@@ -45,7 +44,14 @@ async function embedAsset(pdf: PDFDocument, url: string | null | undefined) {
   return null;
 }
 
-export async function buildQuotePdfV2(quote: QuoteRequest, settings: HotelSettings, kind: "receipt" | "quote") {
+export async function buildQuotePdfV2(
+  quote: QuoteRequest,
+  settings: HotelSettings,
+  kind: "receipt" | "quote",
+  options: { designVersion?: 2 | 3; model?: ReturnType<typeof buildQuoteDocumentModel> } = {},
+) {
+  const designVersion = options.designVersion || 2;
+  const model = options.model || buildQuoteDocumentModel(quote, settings, kind);
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -71,7 +77,7 @@ export async function buildQuotePdfV2(quote: QuoteRequest, settings: HotelSettin
       target.drawText("PALACIO", { x: left, y: height - 54, size: 25, font: bold, color: rgb(1, 1, 1) });
       target.drawText("H O T E L", { x: left + 2, y: height - 73, size: 8, font: regular, color: colors.accentLight });
     }
-    target.drawText(clean(settings.addressFr), { x: 330, y: height - 42, size: 8.5, font: regular, color: rgb(1, 1, 1), maxWidth: 220 });
+    target.drawText(clean(designVersion >= 3 ? model.hotel.address : settings.addressFr), { x: 330, y: height - 42, size: 8.5, font: regular, color: rgb(1, 1, 1), maxWidth: 220 });
     target.drawText(clean(`${settings.phone}  ·  ${settings.email}`), { x: 330, y: height - 59, size: 8.5, font: regular, color: colors.accentLight, maxWidth: 220 });
   };
   drawHeader(page);
@@ -79,7 +85,12 @@ export async function buildQuotePdfV2(quote: QuoteRequest, settings: HotelSettin
 
   const addPage = () => {
     page = pdf.addPage([width, height]);
-    y = height - 54;
+    if (designVersion >= 3) {
+      drawHeader(page);
+      y = height - 146;
+    } else {
+      y = height - 54;
+    }
   };
   const ensure = (space: number) => { if (y - space < 70) addPage(); };
   const drawText = (value: unknown, x = left, size = 9.5, color = colors.ink, font = regular, maxWidth = contentWidth, lineGap = 4) => {
@@ -113,7 +124,7 @@ export async function buildQuotePdfV2(quote: QuoteRequest, settings: HotelSettin
   page.drawText(isEn ? "PREPARED FOR" : "ÉTABLI POUR", { x: left + 12, y: infoTop - 17, size: 7.5, font: bold, color: colors.accent });
   page.drawText(clean(quote.guestName), { x: left + 12, y: infoTop - 34, size: 11, font: bold, color: colors.ink, maxWidth: 210 });
   page.drawText(clean(quote.company || quote.guestEmail), { x: left + 12, y: infoTop - 49, size: 8, font: regular, color: colors.muted, maxWidth: 210 });
-  page.drawText(clean(quote.company ? quote.guestEmail : quote.guestPhone), { x: left + 12, y: infoTop - 61, size: 8, font: regular, color: colors.muted, maxWidth: 210 });
+  page.drawText(clean(designVersion >= 3 && quote.company ? `${quote.guestEmail} · ${quote.guestPhone}` : quote.company ? quote.guestEmail : quote.guestPhone), { x: left + 12, y: infoTop - 61, size: 8, font: regular, color: colors.muted, maxWidth: 210 });
   page.drawText(isEn ? "PROJECT OVERVIEW" : "VOTRE PROJET", { x: 319, y: infoTop - 17, size: 7.5, font: bold, color: colors.accent });
   page.drawText(clean(quote.requestKind.replaceAll("_", " ")), { x: 319, y: infoTop - 34, size: 11, font: bold, color: colors.ink, maxWidth: 218 });
   const period = quote.checkIn ? `${quote.checkIn}${quote.checkOut ? ` → ${quote.checkOut}` : ""}` : (isEn ? "Dates to be confirmed" : "Dates à confirmer");
@@ -134,7 +145,10 @@ export async function buildQuotePdfV2(quote: QuoteRequest, settings: HotelSettin
   for (const [index, item] of items.entries()) {
     const meta = formatQuoteLineMeta(item, quote.locale as "fr" | "en");
     const meal = item.type === "restaurant" ? formatQuoteLineMeals(item.meal_types, quote.locale as "fr" | "en") : "";
-    const detailLines = [meta.replace(/\n/g, " · "), meal].filter(Boolean);
+    const description = quote.locale === "en" ? item.description_en : item.description_fr;
+    const detailLines = designVersion >= 3
+      ? [meta.replace(/\n/g, " · "), description ? clean(description).slice(0, 120) : ""].filter(Boolean)
+      : [meta.replace(/\n/g, " · "), meal].filter(Boolean);
     const rowHeight = Math.max(34, 16 + detailLines.length * 10);
     ensure(rowHeight + 8);
     if (index % 2 === 0) page.drawRectangle({ x: left, y: y - rowHeight + 5, width: contentWidth, height: rowHeight, color: colors.soft });
@@ -152,7 +166,7 @@ export async function buildQuotePdfV2(quote: QuoteRequest, settings: HotelSettin
   }
 
   const calculatedTotal = quoteTotal(items);
-  const total = quote.amountTtc != null && quote.amountTtc > 0 ? quote.amountTtc : quote.estimatedTotal ?? calculatedTotal;
+  const total = designVersion >= 3 ? model.total : quote.amountTtc != null && quote.amountTtc > 0 ? quote.amountTtc : quote.estimatedTotal ?? calculatedTotal;
   ensure(105);
   y -= 18;
   page.drawRectangle({ x: 327, y: y - 70, width: 226, height: 70, color: colors.soft });
@@ -197,16 +211,15 @@ export async function buildQuotePdfV2(quote: QuoteRequest, settings: HotelSettin
     const scale = Math.min(120 / adminSignature.width, 38 / adminSignature.height);
     page.drawImage(adminSignature, { x: 317, y: y - 37, width: adminSignature.width * scale, height: adminSignature.height * scale });
   }
-  if (adminStamp) {
-    const scale = Math.min(58 / adminStamp.width, 58 / adminStamp.height);
-    page.drawImage(adminStamp, { x: 445, y: y - 42, width: adminStamp.width * scale, height: adminStamp.height * scale, opacity: .78 });
-  }
   page.drawLine({ start: { x: left + 8, y: y - 48 }, end: { x: left + 208, y: y - 48 }, thickness: .7, color: colors.border });
   page.drawLine({ start: { x: 310, y: y - 48 }, end: { x: right, y: y - 48 }, thickness: .7, color: colors.border });
   page.drawText(clean(quote.clientSignerName || (isEn ? "Client" : "Client")), { x: left + 8, y: y - 61, size: 7.5, font: regular, color: colors.ink });
-  page.drawText(clean(quote.adminSignerName || settings.quoteSignerName || settings.hotelName), { x: 310, y: y - 61, size: 7.5, font: regular, color: colors.ink });
+  page.drawText(clean(quote.adminSignerName || settings.quoteSignerName || settings.hotelName), { x: 310, y: y - 61, size: 7.5, font: regular, color: colors.ink, maxWidth: 155 });
   page.drawText(quote.clientSignedAt ? `${isEn ? "Signed" : "Signé"} : ${new Date(quote.clientSignedAt).toLocaleDateString(isEn ? "en-GB" : "fr-FR")}` : (isEn ? "To be signed by client" : "À signer par le client"), { x: left + 8, y: y - 73, size: 7, font: regular, color: colors.muted });
-  page.drawText(quote.adminSignedAt ? `${isEn ? "Signed" : "Signé"} : ${new Date(quote.adminSignedAt).toLocaleDateString(isEn ? "en-GB" : "fr-FR")}` : "", { x: 310, y: y - 73, size: 7, font: regular, color: colors.muted });
+  const adminRole = designVersion >= 3 ? quote.adminSignerRole || settings.quoteSignerRole : "";
+  const adminSigned = quote.adminSignedAt ? `${isEn ? "Signed" : "Signé"} : ${new Date(quote.adminSignedAt).toLocaleDateString(isEn ? "en-GB" : "fr-FR")}` : "";
+  page.drawText(clean([adminRole, adminSigned].filter(Boolean).join(" · ")), { x: 310, y: y - 73, size: 7, font: regular, color: colors.muted, maxWidth: 155 });
+  if (adminStamp) page.drawImage(adminStamp, containInBox(adminStamp, { x: 418, y: y - 86, width: 112, height: 112 }));
 
   const pages = pdf.getPages();
   pages.forEach((current, index) => {

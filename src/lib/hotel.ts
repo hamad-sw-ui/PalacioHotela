@@ -1,6 +1,6 @@
 import { and, eq, gt, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { activityLogs, bookings, catalogItems, contentPages, notifications, siteSettings, type CatalogItem, type ContentPage, type SelectedItem } from "@/db/schema";
+import { activityLogs, bookings, catalogItems, contentPages, notifications, siteSettings, users, type CatalogItem, type ContentPage, type SelectedItem } from "@/db/schema";
 import { ensureSeeded } from "@/lib/seed";
 import { daysBetween } from "@/lib/format";
 import { quoteLineTotal as sharedQuoteLineTotal } from "@/lib/quote-pricing";
@@ -84,6 +84,12 @@ export async function logActivity(action: string, entity: string, entityId: numb
 
 export async function notifyAdmin(type: string, title: string, message: string, href: string) {
   await db.insert(notifications).values({ type, title, message, href });
+}
+
+export async function findActiveUserIdByEmail(email: string) {
+  const normalized = email.trim().toLowerCase();
+  const [user] = await db.select({ id: users.id }).from(users).where(and(sql`lower(${users.email}) = ${normalized}`, eq(users.active, true))).limit(1);
+  return user?.id ?? null;
 }
 
 export async function notifyUser(userId: number | null | undefined, type: string, title: string, message: string, href: string) {

@@ -1,5 +1,6 @@
 export function formatXaf(amount: number, locale: string = "fr") {
-  return `${new Intl.NumberFormat(locale === "en" ? "en-US" : "fr-FR", { maximumFractionDigits: 0 }).format(amount)} XAF`;
+  const grouped = Math.round(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, locale === "en" ? "," : "\u00a0");
+  return `${grouped} XAF`;
 }
 
 export function daysBetween(start: string, end: string) {
