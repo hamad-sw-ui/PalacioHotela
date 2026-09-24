@@ -9,6 +9,7 @@ import { enrichQuoteItems } from "@/lib/quote-items";
 import { buildQuoteDocumentModel } from "@/lib/quote-document-model";
 import { quoteInput } from "@/lib/validation";
 import { quoteVisibleToAccount } from "@/lib/quote-account";
+import { remainingFromStays } from "@/lib/availability";
 import { containInBox } from "@/lib/pdf-image-fit";
 import { decodeSignature } from "@/lib/signature-file";
 import type { CatalogItem, HotelSettings, QuoteRequest, SelectedItem } from "@/db/schema";
@@ -124,6 +125,13 @@ test("a digital signature is accepted only as a real PNG or JPEG", () => {
   const png = Buffer.concat([Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64"), Buffer.alloc(80)]);
   assert.equal(decodeSignature(`data:image/png;base64,${png.toString("base64")}`).extension, "png");
   assert.throws(() => decodeSignature("data:image/webp;base64,AAAA"), /PNG ou JPEG/);
+});
+
+test("availability follows the busiest day and frees the checkout day", () => {
+  const separateNights = Array.from({ length: 8 }, (_, index) => ({ start: `2027-06-${String(index * 2 + 1).padStart(2, "0")}`, end: `2027-06-${String(index * 2 + 2).padStart(2, "0")}`, quantity: 1 }));
+  assert.equal(remainingFromStays(8, "2027-06-01", "2027-06-20", separateNights), 7);
+  assert.equal(remainingFromStays(1, "2027-06-03", "2027-06-05", [{ start: "2027-06-01", end: "2027-06-03", quantity: 1 }]), 1);
+  assert.equal(remainingFromStays(1, "2027-06-01", "2027-06-06", [{ start: "2027-06-01", end: "2027-06-03", quantity: 1 }, { start: "2027-06-03", end: "2027-06-05", quantity: 1 }]), 0);
 });
 
 test("a stamp keeps the same place and stays fully visible at any resolution", () => {

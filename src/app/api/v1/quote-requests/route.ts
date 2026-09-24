@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { quoteRequests } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
+import { demandRanges } from "@/lib/availability";
 import { findActiveUserIdByEmail, getPublicCatalog, getSettings, logActivity, notifyAdmin, notifyUser, remainingAvailability, validDateRange } from "@/lib/hotel";
 import { sendQuoteReceivedEmails } from "@/lib/mail";
 import { buildQuotePdf } from "@/lib/pdf-quote";
@@ -27,11 +28,9 @@ export async function POST(request: Request) {
     for (const selected of input.selectedItems) {
       const item = catalog.find((entry) => entry.id === selected.property_id);
       if (!item) return Response.json({ error: "Un élément sélectionné n'est plus disponible." }, { status: 400 });
-      const start = selected.check_in || input.checkIn || undefined;
-      const end = selected.check_out || input.checkOut || undefined;
-      if (start && end) {
-        if (!validDateRange(start, end)) return Response.json({ error: "Les dates d'un élément sont invalides." }, { status: 400 });
-        if (await remainingAvailability(item, start, end) < selected.quantity) return Response.json({ error: `${item.nameFr} n'est plus disponible à ces dates.` }, { status: 409 });
+      for (const range of demandRanges(selected, { start: input.checkIn, end: input.checkOut })) {
+        if (!validDateRange(range.start, range.end)) return Response.json({ error: "Les dates d'un élément sont invalides." }, { status: 400 });
+        if (await remainingAvailability(item, range.start, range.end) < selected.quantity) return Response.json({ error: `${item.nameFr} n'est plus disponible à ces dates.` }, { status: 409 });
       }
     }
     const selectedItems = enrichQuoteItems(input.selectedItems, catalog, { checkIn: input.checkIn, checkOut: input.checkOut, source: "web" });

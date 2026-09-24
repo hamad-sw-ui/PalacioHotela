@@ -1,6 +1,7 @@
 import { and, eq, gt, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { activityLogs, bookings, catalogItems, contentPages, notifications, siteSettings, users, type CatalogItem, type ContentPage, type SelectedItem } from "@/db/schema";
+import { activityLogs, bookings, catalogItems, contentPages, notifications, quoteRequests, siteSettings, users, type CatalogItem, type ContentPage, type SelectedItem } from "@/db/schema";
+import { demandRanges, remainingFromStays, type Stay } from "@/lib/availability";
 import { ensureSeeded } from "@/lib/seed";
 import { daysBetween } from "@/lib/format";
 import { quoteLineTotal as sharedQuoteLineTotal } from "@/lib/quote-pricing";
@@ -73,9 +74,20 @@ export function quoteLineTotal(item: SelectedItem) {
   return sharedQuoteLineTotal(item);
 }
 
-export async function remainingAvailability(item: CatalogItem, start: string, end: string) {
-  const [result] = await db.select({ reserved: sql<number>`coalesce(sum(${bookings.quantity}), 0)::int` }).from(bookings).where(and(eq(bookings.itemId, item.id), lt(bookings.checkIn, end), gt(bookings.checkOut, start), inArray(bookings.status, ["pending", "confirmed", "checked_in"])));
-  return Math.max(0, item.inventory - Number(result?.reserved || 0));
+export async function remainingAvailability(item: CatalogItem, start: string, end: string, options: { excludeBookingId?: number; excludeQuoteId?: number } = {}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const reserved = await db.select({ id: bookings.id, checkIn: bookings.checkIn, checkOut: bookings.checkOut, quantity: bookings.quantity }).from(bookings).where(and(eq(bookings.itemId, item.id), lt(bookings.checkIn, end), gt(bookings.checkOut, start), inArray(bookings.status, ["pending", "confirmed", "checked_in"])));
+  const holds = await db.select({ id: quoteRequests.id, status: quoteRequests.status, checkIn: quoteRequests.checkIn, checkOut: quoteRequests.checkOut, validUntil: quoteRequests.validUntil, selectedItems: quoteRequests.selectedItems }).from(quoteRequests).where(inArray(quoteRequests.status, ["quote_sent", "negotiating", "accepted"]));
+  const stays: Stay[] = reserved.filter((booking) => booking.id !== options.excludeBookingId).map((booking) => ({ start: booking.checkIn, end: booking.checkOut, quantity: booking.quantity }));
+  for (const quote of holds) {
+    if (quote.id === options.excludeQuoteId) continue;
+    if (quote.status !== "accepted" && quote.validUntil && quote.validUntil < today) continue;
+    for (const line of quote.selectedItems) {
+      if (line.property_id !== item.id) continue;
+      stays.push(...demandRanges(line, { start: quote.checkIn, end: quote.checkOut }).map((range) => ({ ...range, quantity: line.quantity })));
+    }
+  }
+  return remainingFromStays(item.inventory, start, end, stays);
 }
 
 export async function logActivity(action: string, entity: string, entityId: number | null, actorName = "Site web", actorId: number | null = null, details = "") {

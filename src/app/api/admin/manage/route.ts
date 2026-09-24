@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { bookings, catalogItems, contactMessages, contentPages, notifications, quoteRequests, siteSettings, users } from "@/db/schema";
 import { getAdminForMutation, hashPassword } from "@/lib/auth";
+import { demandRanges } from "@/lib/availability";
 import { bookingTotal, findActiveUserIdByEmail, getSettings, logActivity, notifyUser, remainingAvailability, validDateRange } from "@/lib/hotel";
 import { sendBookingEmails, sendBookingStateEmails, sendQuoteSentEmail, sendQuoteStateEmails } from "@/lib/mail";
 import { buildQuotePdf } from "@/lib/pdf-quote";
@@ -87,7 +88,7 @@ async function manageBookings(action: string, id: number, data: Record<string, u
   if (!validDateRange(start, end) && (parsed.checkIn || parsed.checkOut || parsed.itemId)) throw new Error("Dates invalides.");
   if (guests > item.capacity * quantity) throw new Error("Capacité insuffisante.");
   if (parsed.checkIn || parsed.checkOut || parsed.itemId || parsed.quantity) {
-    const free = await remainingAvailability(item, start, end) + (item.id === current.itemId && current.status !== "cancelled" && current.checkIn < end && current.checkOut > start ? current.quantity : 0);
+    const free = await remainingAvailability(item, start, end, { excludeBookingId: current.status === "cancelled" ? undefined : current.id });
     if (quantity > free) throw new Error("Disponibilité insuffisante.");
   }
   const [record] = await db.update(bookings).set({ ...parsed, itemName: (parsed.locale || current.locale) === "en" ? item.nameEn : item.nameFr, total: bookingTotal(item, start, end, quantity), updatedAt: new Date() }).where(eq(bookings.id, id)).returning();
@@ -197,6 +198,13 @@ async function manageQuotes(action: string, id: number, data: Record<string, unk
     if (!validUntil) { const date = new Date(); date.setDate(date.getDate() + 30); validUntil = date.toISOString().slice(0, 10); }
     if (!Number.isInteger(amountTtc) || amountTtc <= 0 || amountTtc > 1000000000 || !/^\d{4}-\d{2}-\d{2}$/.test(validUntil) || validUntil < new Date().toISOString().slice(0, 10)) throw new Error("Renseignez un montant TTC positif et une date de validité future.");
     const adminNotes = data.adminNotes === undefined ? current.adminNotes : z.string().max(4000).parse(data.adminNotes);
+    for (const line of current.selectedItems) {
+      const [item] = await db.select().from(catalogItems).where(eq(catalogItems.id, line.property_id)).limit(1);
+      if (!item) continue;
+      for (const range of demandRanges(line, { start: current.checkIn, end: current.checkOut })) {
+        if (await remainingAvailability(item, range.start, range.end, { excludeQuoteId: current.id }) < line.quantity) throw new Error(`${line.name_fr} n'est plus disponible à ces dates.`);
+      }
+    }
     const settings = await getSettings();
     let signatureUrl = settings.quoteSignatureUrl;
     let signerName = settings.quoteSignerName;
