@@ -10,7 +10,10 @@ import { bookingInput, parseError } from "@/lib/validation";
 
 export async function POST(request: Request) {
   try {
-    const input = bookingInput.parse(await request.json());
+    // A signed-in client never dictates its own contact details: the account's are used instead.
+    const user = await getCurrentUser();
+    const raw = bookingInput.parse(await request.json());
+    const input = user ? { ...raw, guestName: user.fullName, guestEmail: user.email, guestPhone: user.phone || raw.guestPhone } : raw;
     if (!validDateRange(input.checkIn, input.checkOut)) return Response.json({ error: "Dates invalides. Sélectionnez des dates futures cohérentes." }, { status: 400 });
     const item = (await getPublicCatalog()).find((record) => record.id === input.itemId);
     if (!item) return Response.json({ error: "Cet espace n'est plus disponible." }, { status: 404 });
@@ -19,7 +22,6 @@ export async function POST(request: Request) {
     if (input.quantity > available) return Response.json({ error: `Seulement ${available} unité(s) disponible(s) pour ces dates.` }, { status: 409 });
     const methods = paymentConfiguration();
     if (input.paymentMethod === "card" && !methods.card || input.paymentMethod === "paypal" && !methods.paypal) return Response.json({ error: "Ce mode de paiement n'est pas encore configuré. Choisissez le paiement sur place." }, { status: 400 });
-    const user = await getCurrentUser();
     const token = randomBytes(28).toString("hex");
     const total = bookingTotal(item, input.checkIn, input.checkOut, input.quantity);
     const [created] = await db.insert(bookings).values({ publicToken: token, userId: user?.id || null, itemId: item.id, itemName: input.locale === "en" ? item.nameEn : item.nameFr, guestName: input.guestName, guestEmail: input.guestEmail, guestPhone: input.guestPhone, locale: input.locale, checkIn: input.checkIn, checkOut: input.checkOut, guests: input.guests, quantity: input.quantity, total, notes: input.notes, paymentMethod: input.paymentMethod, paymentStatus: input.paymentMethod === "cash" ? "pay_on_site" : "unpaid" }).returning();

@@ -10,7 +10,10 @@ import { parseError, quoteInput } from "@/lib/validation";
 
 export async function POST(request: Request) {
   try {
-    const input = quoteInput.parse(await request.json());
+    // A signed-in client never dictates its own contact details: the account's are used instead.
+    const user = await getCurrentUser();
+    const raw = quoteInput.parse(await request.json());
+    const input = user ? { ...raw, guestName: user.fullName, guestEmail: user.email, guestPhone: user.phone || raw.guestPhone, company: user.phone ? raw.company : raw.company } : raw;
     if ((input.checkIn || input.checkOut) && (!input.checkIn || !input.checkOut || !validDateRange(input.checkIn, input.checkOut))) return Response.json({ error: "Dates invalides / Invalid dates" }, { status: 400 });
     const catalog = await getPublicCatalog();
     const selectedItems: SelectedItem[] = [];
@@ -25,7 +28,9 @@ export async function POST(request: Request) {
       }
       selectedItems.push({ property_id: item.id, type: item.category as SelectedItem["type"], name_fr: item.nameFr, name_en: item.nameEn, price: item.price, quantity: selected.quantity, ...(item.category === "accommodation" && start && end ? { nights: Math.max(1, Math.round((Date.parse(end) - Date.parse(start)) / 86400000)) } : {}), ...(start ? { check_in: start } : {}), ...(end ? { check_out: end } : {}), ...(selected.dates ? { dates: selected.dates } : {}), ...(selected.meal_types ? { meal_types: selected.meal_types } : {}), ...(selected.parent_id ? { parent_id: selected.parent_id } : {}), source: "web" });
     }
-    const user = await getCurrentUser();
+    // The hotel cannot host more people than the selected spaces allow: reject impossible requests early.
+    const capacity = selectedItems.reduce((sum, item) => sum + (item.type === "accommodation" || item.type === "conference_room" || item.type === "event_hall" ? (catalog.find((entry) => entry.id === item.property_id)?.capacity || 0) * item.quantity : 0), 0);
+    if (capacity > 0 && input.people > capacity) return Response.json({ error: `Le nombre de personnes (${input.people}) dépasse la capacité totale des espaces sélectionnés (${capacity}). Réduisez le nombre de personnes ou ajoutez des espaces.` }, { status: 400 });
     const [created] = await db.insert(quoteRequests).values({ publicToken: randomBytes(28).toString("hex"), userId: user?.id || null, guestName: input.guestName, guestEmail: input.guestEmail, guestPhone: input.guestPhone, company: input.company, locale: input.locale, requestKind: input.requestKind, selectedItems, checkIn: input.checkIn || null, checkOut: input.checkOut || null, people: input.people, message: input.message, budget: input.budget ?? null, status: "new" }).returning();
     const reference = `DEV-${new Date().getFullYear()}-${String(created.id).padStart(5, "0")}`;
     const [quote] = await db.update(quoteRequests).set({ reference }).where(eq(quoteRequests.id, created.id)).returning();

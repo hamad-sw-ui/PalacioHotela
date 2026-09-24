@@ -8,7 +8,7 @@ import { ensureAdminAccount, ensureSeeded } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
 
-const publicUser = (user: { id: number; fullName: string; email: string; role: string; locale: string }) => ({ id: user.id, fullName: user.fullName, email: user.email, role: user.role, locale: user.locale });
+const publicUser = (user: { id: number; fullName: string; email: string; phone?: string | null; role: string; locale: string }) => ({ id: user.id, fullName: user.fullName, email: user.email, phone: user.phone || "", role: user.role, locale: user.locale });
 const noStore = { "Cache-Control": "no-store" };
 
 // Tolerates stray spaces or capitals that browsers, keyboards and copy-paste can introduce.
