@@ -3,7 +3,8 @@ import { test } from "node:test";
 import { PDFDocument } from "pdf-lib";
 import { quoteLineTotal, quoteTotal, restaurantLineIdentity } from "@/lib/quote-pricing";
 import { buildQuotePdfV2 } from "@/lib/pdf-quote-v2";
-import type { HotelSettings, QuoteRequest, SelectedItem } from "@/db/schema";
+import { analyzeQuoteMessage } from "@/lib/ai-provider";
+import type { CatalogItem, HotelSettings, QuoteRequest, SelectedItem } from "@/db/schema";
 
 const restaurant = (overrides: Partial<SelectedItem> = {}): SelectedItem => ({
   property_id: 7,
@@ -47,4 +48,23 @@ test("PDF v2 is generated with all lines and a stable A4 document", async () => 
   const document = await PDFDocument.load(bytes);
   assert.equal(document.getPages().length, 1);
   assert.equal(quoteTotal(items), 85000);
+});
+
+const catalog = (overrides: Partial<CatalogItem>): CatalogItem => ({ id: 1, slug: "item", category: "accommodation", nameFr: "Chambre Deluxe", nameEn: "Deluxe Room", descriptionFr: "", descriptionEn: "", image: "", price: 95000, pricingUnit: "night", capacity: 2, inventory: 8, amenitiesFr: [], amenitiesEn: [], featured: true, active: true, createdAt: new Date(), updatedAt: new Date(), ...overrides });
+
+test("local quote assistant turns natural language into catalog-backed lines", async () => {
+  const result = await analyzeQuoteMessage({
+    provider: "local",
+    locale: "fr",
+    message: "Nous sommes 18 personnes du 10 novembre au 12 novembre. Il nous faut 6 chambres, une salle de réunion, le déjeuner et le dîner.",
+    catalog: [catalog({ id: 1, category: "accommodation" }), catalog({ id: 2, category: "conference_room", nameFr: "Salon Acacia", nameEn: "Acacia Conference Room", slug: "salon-acacia", pricingUnit: "day", capacity: 60, price: 350000 }), catalog({ id: 3, category: "restaurant", nameFr: "La Table du Palacio", nameEn: "Palacio Dining", slug: "table-palacio", pricingUnit: "person", price: 32000 })],
+  people: 18,
+  checkIn: null,
+  checkOut: null,
+});
+  assert.equal(result.source, "local");
+  assert.ok(result.lines.some((line) => line.category === "accommodation" && line.quantity === 6));
+  assert.ok(result.lines.some((line) => line.category === "conference_room"));
+  assert.ok(result.lines.some((line) => line.category === "restaurant" && line.mealTypes?.includes("lunch") && line.mealTypes.includes("dinner")));
+  assert.ok(result.lines.every((line) => line.catalogItemId));
 });
