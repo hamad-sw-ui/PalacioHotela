@@ -6,7 +6,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:quote": "node --import tsx --test scripts/quote-regression.test.ts"
   },
   "dependencies": {
     "@types/nodemailer": "^8.0.2",

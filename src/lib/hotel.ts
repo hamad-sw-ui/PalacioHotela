@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { activityLogs, bookings, catalogItems, contentPages, notifications, siteSettings, type CatalogItem, type ContentPage, type SelectedItem } from "@/db/schema";
 import { ensureSeeded } from "@/lib/seed";
 import { daysBetween } from "@/lib/format";
+import { quoteLineTotal as sharedQuoteLineTotal } from "@/lib/quote-pricing";
 export { daysBetween, formatXaf, validDateRange } from "@/lib/format";
 
 export async function getSettings() {
@@ -23,7 +24,7 @@ export async function getSettings() {
       aboutFr: "Plus qu’un hôtel, une destination.", aboutEn: "More than a hotel, a destination.", aboutImage: "/images/palacio-dining.jpg",
       theme: "forest", email: "bonjour@palaciohotel.com", phone: "+237 6 99 00 00 00", whatsapp: "237699000000",
       addressFr: "Bonanjo, Douala, Cameroun", addressEn: "Bonanjo, Douala, Cameroon", latitude: 4.0511, longitude: 9.7679,
-      acceptingQuotes: true, aiProvider: "auto", aiBaseUrl: "", aiModel: "", updatedAt: new Date(),
+      acceptingQuotes: true, aiProvider: "auto", aiBaseUrl: "", aiModel: "", quoteSignatureUrl: "", quoteStampUrl: "", quoteSignerName: "", quoteSignerRole: "", quoteTermsFr: "", quoteTermsEn: "", updatedAt: new Date(),
     };
   }
 }
@@ -67,9 +68,7 @@ export function bookingTotal(item: CatalogItem, start: string, end: string, quan
 }
 
 export function quoteLineTotal(item: SelectedItem) {
-  const nights = item.nights || (item.check_in && item.check_out ? Math.max(1, daysBetween(item.check_in, item.check_out)) : 1);
-  const units = item.type === "accommodation" ? nights : item.type === "restaurant" ? Math.max(1, item.dates?.length || 1) * Math.max(1, item.meal_types?.length || 1) : item.type === "conference_room" || item.type === "event_hall" ? Math.max(1, item.dates?.length || (item.check_in && item.check_out ? daysBetween(item.check_in, item.check_out) : 1)) : 1;
-  return Math.max(0, item.price) * Math.max(1, item.quantity) * units;
+  return sharedQuoteLineTotal(item);
 }
 
 export async function remainingAvailability(item: CatalogItem, start: string, end: string) {

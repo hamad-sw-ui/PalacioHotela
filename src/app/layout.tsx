@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
 import "./extra.css";
+import "./quote-enhancements.css";
 
 export const metadata: Metadata = {
   title: { default: "Palacio Hotel | L'art de vivre à Douala", template: "%s | Palacio Hotel" },

@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getPublicCatalog, getSettings, logActivity, notifyAdmin, notifyUser, remainingAvailability, validDateRange } from "@/lib/hotel";
 import { sendQuoteReceivedEmails } from "@/lib/mail";
 import { buildQuotePdf } from "@/lib/pdf-quote";
+import { quoteTotal, normalizeDates, normalizeMealTypes } from "@/lib/quote-pricing";
 import { parseError, quoteInput } from "@/lib/validation";
 
 export async function POST(request: Request) {
@@ -26,12 +27,34 @@ export async function POST(request: Request) {
         if (!validDateRange(start, end)) return Response.json({ error: "Les dates d'un élément sont invalides." }, { status: 400 });
         if (await remainingAvailability(item, start, end) < selected.quantity) return Response.json({ error: `${item.nameFr} n'est plus disponible à ces dates.` }, { status: 409 });
       }
-      selectedItems.push({ property_id: item.id, type: item.category as SelectedItem["type"], name_fr: item.nameFr, name_en: item.nameEn, price: item.price, quantity: selected.quantity, ...(item.category === "accommodation" && start && end ? { nights: Math.max(1, Math.round((Date.parse(end) - Date.parse(start)) / 86400000)) } : {}), ...(start ? { check_in: start } : {}), ...(end ? { check_out: end } : {}), ...(selected.dates ? { dates: selected.dates } : {}), ...(selected.meal_types ? { meal_types: selected.meal_types } : {}), ...(selected.parent_id ? { parent_id: selected.parent_id } : {}), source: "web" });
+      const orderDates = normalizeDates(selected.order_dates || selected.dates, selected.order_date || (item.category === "restaurant" ? start : undefined));
+      selectedItems.push({
+        property_id: item.id,
+        type: item.category as SelectedItem["type"],
+        name_fr: item.nameFr,
+        name_en: item.nameEn,
+        description_fr: item.descriptionFr,
+        description_en: item.descriptionEn,
+        image: item.image,
+        price: item.price,
+        quantity: selected.quantity,
+        ...(item.category === "accommodation" && start && end ? { nights: Math.max(1, Math.round((Date.parse(end) - Date.parse(start)) / 86400000)) } : {}),
+        ...(start ? { check_in: start } : {}),
+        ...(end ? { check_out: end } : {}),
+        ...(selected.dates ? { dates: selected.dates } : {}),
+        ...(orderDates.length ? { order_dates: orderDates } : {}),
+        ...(selected.order_date ? { order_date: selected.order_date } : {}),
+        ...(selected.order_time ? { order_time: selected.order_time } : {}),
+        ...(selected.meal_types ? { meal_types: normalizeMealTypes(selected.meal_types) } : {}),
+        ...(selected.parent_id ? { parent_id: selected.parent_id } : {}),
+        ...(selected.parent_item_name ? { parent_item_name: selected.parent_item_name } : {}),
+        source: "web",
+      });
     }
     // The hotel cannot host more people than the selected spaces allow: reject impossible requests early.
     const capacity = selectedItems.reduce((sum, item) => sum + (item.type === "accommodation" || item.type === "conference_room" || item.type === "event_hall" ? (catalog.find((entry) => entry.id === item.property_id)?.capacity || 0) * item.quantity : 0), 0);
     if (capacity > 0 && input.people > capacity) return Response.json({ error: `Le nombre de personnes (${input.people}) dépasse la capacité totale des espaces sélectionnés (${capacity}). Réduisez le nombre de personnes ou ajoutez des espaces.` }, { status: 400 });
-    const [created] = await db.insert(quoteRequests).values({ publicToken: randomBytes(28).toString("hex"), userId: user?.id || null, guestName: input.guestName, guestEmail: input.guestEmail, guestPhone: input.guestPhone, company: input.company, locale: input.locale, requestKind: input.requestKind, selectedItems, checkIn: input.checkIn || null, checkOut: input.checkOut || null, people: input.people, message: input.message, budget: input.budget ?? null, status: "new" }).returning();
+    const [created] = await db.insert(quoteRequests).values({ publicToken: randomBytes(28).toString("hex"), userId: user?.id || null, guestName: input.guestName, guestEmail: input.guestEmail, guestPhone: input.guestPhone, company: input.company, locale: input.locale, requestKind: input.requestKind, selectedItems, checkIn: input.checkIn || null, checkOut: input.checkOut || null, people: input.people, message: input.message, budget: input.budget ?? null, estimatedTotal: quoteTotal(selectedItems), pdfTemplateVersion: 2, status: "new" }).returning();
     const reference = `DEV-${new Date().getFullYear()}-${String(created.id).padStart(5, "0")}`;
     const [quote] = await db.update(quoteRequests).set({ reference }).where(eq(quoteRequests.id, created.id)).returning();
     const settings = await getSettings();

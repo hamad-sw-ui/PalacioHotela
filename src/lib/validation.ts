@@ -25,8 +25,12 @@ const quoteItemInput = z.object({
   check_in: date.optional(),
   check_out: date.optional(),
   dates: z.array(date).max(30).optional(),
-  meal_types: z.array(z.string().max(30)).max(4).optional(),
+  order_date: date.optional(),
+  order_dates: z.array(date).max(30).optional(),
+  order_time: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/).optional(),
+  meal_types: z.array(z.string().trim().max(30)).max(4).optional(),
   parent_id: z.coerce.number().int().positive().optional(),
+  parent_item_name: z.string().trim().max(200).optional(),
 });
 
 export const quoteInput = z.object({

@@ -1,10 +1,11 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { HotelSettings, QuoteRequest } from "@/db/schema";
 import { formatXaf, quoteLineTotal } from "@/lib/hotel";
+import { buildQuotePdfV2 } from "@/lib/pdf-quote-v2";
 
 const clean = (value: unknown) => String(value ?? "").replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/[\u2013\u2014]/g, "-").replace(/\u0153/g, "oe").replace(/[^\x20-\xFF]/g, " ");
 
-export async function buildQuotePdf(quote: QuoteRequest, settings: HotelSettings, kind: "receipt" | "quote") {
+export async function buildLegacyQuotePdf(quote: QuoteRequest, settings: HotelSettings, kind: "receipt" | "quote") {
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -79,4 +80,8 @@ export async function buildQuotePdf(quote: QuoteRequest, settings: HotelSettings
     pages[i].drawText(`${i + 1}/${pages.length}`, { x: 510, y: 38, size: 8, font: regular, color: gray });
   }
   return pdf.save();
+}
+
+export async function buildQuotePdf(quote: QuoteRequest, settings: HotelSettings, kind: "receipt" | "quote") {
+  return quote.pdfTemplateVersion >= 2 && kind === "quote" ? buildQuotePdfV2(quote, settings, kind) : buildLegacyQuotePdf(quote, settings, kind);
 }

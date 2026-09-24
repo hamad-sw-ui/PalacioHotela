@@ -5,14 +5,21 @@ export type SelectedItem = {
   type: "accommodation" | "restaurant" | "conference_room" | "event_hall" | "service";
   name_fr: string;
   name_en: string;
+  description_fr?: string;
+  description_en?: string;
+  image?: string;
   price: number;
   quantity: number;
   nights?: number;
   check_in?: string;
   check_out?: string;
   dates?: string[];
+  order_date?: string;
+  order_dates?: string[];
+  order_time?: string;
   meal_types?: string[];
   parent_id?: number;
+  parent_item_name?: string;
   source?: string;
 };
 
@@ -53,6 +60,12 @@ export const siteSettings = pgTable("site_settings", {
   aiProvider: varchar("ai_provider", { length: 24 }).notNull().default("auto"),
   aiBaseUrl: text("ai_base_url").notNull().default(""),
   aiModel: varchar("ai_model", { length: 120 }).notNull().default(""),
+  quoteSignatureUrl: text("quote_signature_url").notNull().default(""),
+  quoteStampUrl: text("quote_stamp_url").notNull().default(""),
+  quoteSignerName: varchar("quote_signer_name", { length: 180 }).notNull().default(""),
+  quoteSignerRole: varchar("quote_signer_role", { length: 180 }).notNull().default(""),
+  quoteTermsFr: text("quote_terms_fr").notNull().default(""),
+  quoteTermsEn: text("quote_terms_en").notNull().default(""),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -121,10 +134,24 @@ export const quoteRequests = pgTable("quote_requests", {
   people: integer("people").notNull().default(1),
   message: text("message").notNull().default(""),
   budget: integer("budget"),
+  estimatedTotal: integer("estimated_total"),
   amountTtc: integer("amount_ttc"),
   validUntil: date("valid_until"),
   status: varchar("status", { length: 24 }).notNull().default("new"),
   adminNotes: text("admin_notes").notNull().default(""),
+  pdfTemplateVersion: integer("pdf_template_version").notNull().default(1),
+  adminSignatureUrl: text("admin_signature_url"),
+  adminSignerName: varchar("admin_signer_name", { length: 180 }),
+  adminSignerRole: varchar("admin_signer_role", { length: 180 }),
+  adminSignedAt: timestamp("admin_signed_at", { withTimezone: true }),
+  adminStampUrl: text("admin_stamp_url"),
+  clientSignatureUrl: text("client_signature_url"),
+  clientSignerName: varchar("client_signer_name", { length: 180 }),
+  clientSignedAt: timestamp("client_signed_at", { withTimezone: true }),
+  clientAcceptanceIp: varchar("client_acceptance_ip", { length: 120 }),
+  clientAcceptanceUserAgent: text("client_acceptance_user_agent"),
+  termsSnapshotFr: text("terms_snapshot_fr").notNull().default(""),
+  termsSnapshotEn: text("terms_snapshot_en").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("quotes_status_idx").on(t.status), index("quotes_email_idx").on(t.guestEmail)]);
