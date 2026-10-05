@@ -1,7 +1,7 @@
 import type { HotelSettings, QuoteRequest } from "@/db/schema";
 import { formatQuoteLineDates, formatQuoteLineMeals } from "@/lib/quote-line-display";
 import { lineMealUnits, lineUnits, quoteLineTotal, quoteTotal } from "@/lib/quote-pricing";
-import { getQuotePdfPalette } from "@/lib/quote-pdf-theme";
+import { mergePalette } from "@/lib/quote-pdf-theme";
 
 export function buildQuoteDocumentModel(
   quote: QuoteRequest,
@@ -28,7 +28,7 @@ export function buildQuoteDocumentModel(
     kind,
     locale,
     isEn,
-    palette: getQuotePdfPalette(settings.theme),
+    palette: mergePalette(settings.theme, settings.themeColors),
     hotel: {
       name: settings.hotelName,
       logo: settings.logoUrl,
@@ -62,8 +62,8 @@ export function buildQuoteDocumentModel(
     signatures: {
       clientName: quote.clientSignerName,
       clientSignedAt: quote.clientSignedAt,
-      adminName: quote.adminSignerName || settings.quoteSignerName || settings.hotelName,
-      adminRole: quote.adminSignerRole || settings.quoteSignerRole,
+      adminName: quote.adminSignerName || "",
+      adminRole: quote.adminSignerRole || "",
       adminSignedAt: quote.adminSignedAt,
     },
   };

@@ -17,7 +17,8 @@ export function lineQuantity(quantity: unknown) {
 }
 
 export function lineUnits(item: QuoteLineLike) {
-  const dates = normalizeDates(item.order_dates || item.dates, item.order_date || item.check_in);
+  const explicitDates = normalizeDates(item.order_dates || item.dates, item.order_date);
+  const dates = explicitDates.length ? explicitDates : normalizeDates(undefined, item.check_in);
   if (item.type === "restaurant") return Math.max(1, dates.length);
   if (item.type === "accommodation") {
     if (item.nights && item.nights > 0) return Math.max(1, Math.floor(item.nights));

@@ -25,7 +25,7 @@ export async function PATCH(request: Request, { params }: Params) {
   if (body.action === "cancel") {
     if (!["new", "in_review", "quote_sent", "negotiating"].includes(quote.status)) return Response.json({ error: "Cette demande ne peut plus être annulée." }, { status: 409 });
     const [record] = await db.update(quoteRequests).set({ status: "cancelled", updatedAt: new Date() }).where(eq(quoteRequests.id, quote.id)).returning();
-    await sendQuoteCancellationEmails(record, settings);
+    await sendQuoteCancellationEmails(record, settings, new URL(request.url).origin);
     await notifyUser(record.userId, "quote", "Votre demande de devis a été annulée", record.reference || "", `/devis/suivi?token=${record.publicToken}`);
     await notifyAdmin("quote", "Devis annulé par le client", record.reference || record.guestName, `/admin?section=devis&quote=${record.id}`);
     await logActivity("Devis annulé par le client", "quote", record.id, record.guestName, record.userId, record.reference || "");
@@ -40,6 +40,6 @@ export async function PATCH(request: Request, { params }: Params) {
   await notifyUser(quote.userId, "quote", "Votre devis a été accepté", quote.reference || "", `/devis/suivi?token=${quote.publicToken}`);
   await logActivity("Devis accepté par le client", "quote", quote.id, quote.guestName, quote.userId, quote.reference || "");
   const signedPdf = await buildQuotePdf(accepted || { ...quote, status: "accepted", clientSignedAt: new Date() }, settings, "quote");
-  await sendQuoteStateEmails(accepted || quote, settings, "accepted", [{ filename: `${quote.reference}-devis-signe.pdf`, content: Buffer.from(signedPdf) }]);
+  await sendQuoteStateEmails(accepted || quote, settings, "accepted", [{ filename: `${quote.reference}-devis-signe.pdf`, content: Buffer.from(signedPdf) }], new URL(request.url).origin);
   return Response.json({ ok: true, status: "accepted" });
 }

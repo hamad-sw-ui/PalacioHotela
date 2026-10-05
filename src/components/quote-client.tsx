@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -35,10 +35,16 @@ import {
   getQuoteDraft,
   saveQuoteContact,
   setQuoteDraft,
+  markSentQuoteDraft,
+  quoteWasSent,
+  releaseSentQuoteDraft,
   clearQuoteDraft,
   type QuoteDraftRestaurantLine,
 } from "@/lib/quote-draft";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { PageBack } from "@/components/page-back";
 import { tr, useSite, whatsappUrl } from "@/components/site-shell";
+import { signInHref } from "@/lib/member-gate";
 
 type CartLine = {
   lineId: string;
@@ -142,7 +148,10 @@ export function QuoteClient({
   items: CatalogItem[];
   initial: Initial;
 }) {
-  const { locale, settings } = useSite();
+  const { locale, settings, member } = useSite();
+  const router = useRouter();
+  const pathname = usePathname();
+  const search = useSearchParams();
   const initialItem = items.find((item) => item.id === Number(initial.itemId));
   const [category, setCategory] = useState(
     initialItem?.category ||
@@ -157,7 +166,7 @@ export function QuoteClient({
   );
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
-  const [people, setPeople] = useState(2);
+  const [people, setPeople] = useState<number | "">("");
   const [mealTypes, setMealTypes] = useState<string[]>(["dinner"]);
   const [orderDates, setOrderDates] = useState<string[]>([]);
   const [orderTime, setOrderTime] = useState("");
@@ -222,36 +231,71 @@ export function QuoteClient({
         : 0),
     0,
   );
+  const clearSentSelection = useCallback(() => {
+    setCart([]);
+    setCheckIn("");
+    setCheckOut("");
+    setPeople("");
+    setBudget("");
+    setMessage("");
+    setMealTypes(["dinner"]);
+    setOrderDates([]);
+    setOrderTime("");
+    setParentItemName("");
+    setActiveRestaurantLine(null);
+    setAssistantResult(null);
+    setAssistantApplied(false);
+    setConsent(false);
+    setError("");
+  }, []);
+  const showSentQuote = useCallback(() => {
+    if (initialItem) {
+      clearSentSelection();
+      setCart([{ lineId: id(), property_id: initialItem.id, quantity: 1 }]);
+      releaseSentQuoteDraft();
+      return;
+    }
+    clearSentSelection();
+  }, [clearSentSelection, initialItem]);
+  const showSentQuoteRef = useRef(showSentQuote);
+  showSentQuoteRef.current = showSentQuote;
 
   useEffect(() => {
-    const draft = getQuoteDraft();
-    const draftLines = [
-      ...draft.accommodationLines,
-      ...draft.roomLines,
-      ...draft.serviceLines,
-      ...draft.restaurantLines,
-    ].map((line) => ({
-      lineId: line.id || id(),
-      property_id: line.property_id,
-      quantity: line.quantity,
-      order_dates: line.order_dates || line.dates,
-      order_time: line.order_time,
-      meal_types: line.meal_types,
-      parent_item_name: line.parent_item_name,
-    }));
-    if (draftLines.length) setCart(draftLines);
-    if (draft.formSnapshot) {
-      setName(draft.formSnapshot.name || "");
-      setEmail(draft.formSnapshot.email || "");
-      setPhone(draft.formSnapshot.phone || "");
-      setCompany(draft.formSnapshot.company || "");
-      setBudget(draft.formSnapshot.budget || "");
-      setMessage(draft.formSnapshot.message || "");
-      if (draft.formSnapshot.people) setPeople(draft.formSnapshot.people);
-      if (draft.formSnapshot.checkIn) setCheckIn(draft.formSnapshot.checkIn);
-      if (draft.formSnapshot.checkOut) setCheckOut(draft.formSnapshot.checkOut);
+    if (quoteWasSent()) showSentQuoteRef.current();
+    else {
+      const draft = getQuoteDraft();
+      const draftLines = [
+        ...draft.accommodationLines,
+        ...draft.roomLines,
+        ...draft.serviceLines,
+        ...draft.restaurantLines,
+      ].map((line) => ({
+        lineId: line.id || id(),
+        property_id: line.property_id,
+        quantity: line.quantity,
+        order_dates: line.order_dates || line.dates,
+        order_time: line.order_time,
+        meal_types: line.meal_types,
+        parent_item_name: line.parent_item_name,
+      }));
+      if (draftLines.length) setCart(draftLines);
+      if (draft.formSnapshot) {
+        setName(draft.formSnapshot.name || "");
+        setEmail(draft.formSnapshot.email || "");
+        setPhone(draft.formSnapshot.phone || "");
+        setCompany(draft.formSnapshot.company || "");
+        setBudget(draft.formSnapshot.budget || "");
+        setMessage(draft.formSnapshot.message || "");
+        if (draft.formSnapshot.people) setPeople(draft.formSnapshot.people);
+        if (draft.formSnapshot.checkIn) setCheckIn(draft.formSnapshot.checkIn);
+        if (draft.formSnapshot.checkOut) setCheckOut(draft.formSnapshot.checkOut);
+      }
     }
     setDraftReady(true);
+    const onPageShow = () => {
+      if (quoteWasSent()) showSentQuoteRef.current();
+    };
+    window.addEventListener("pageshow", onPageShow);
     authFetch("/api/auth", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
@@ -263,13 +307,18 @@ export function QuoteClient({
         setPhone(user.phone || "");
       })
       .catch(() => {});
+    return () => window.removeEventListener("pageshow", onPageShow);
   }, []);
 
   useEffect(() => {
-    if (peopleMax > 0 && people > peopleMax) setPeople(peopleMax);
+    if (people !== "" && peopleMax > 0 && people > peopleMax) setPeople(peopleMax);
   }, [peopleMax, people]);
   useEffect(() => {
     if (!draftReady) return;
+    if (quoteWasSent()) {
+      clearQuoteDraft();
+      return;
+    }
     const accommodationLines = cart
       .filter(
         (line) =>
@@ -320,7 +369,7 @@ export function QuoteClient({
         company,
         budget,
         message,
-        people,
+        ...(people === "" ? {} : { people }),
         checkIn,
         checkOut,
       },
@@ -341,8 +390,11 @@ export function QuoteClient({
   ]);
   useEffect(() => {
     if (!validDateRange(checkIn, checkOut) || category !== "restaurant") return;
-    if (!orderDates.length) setOrderDates([checkIn]);
-  }, [checkIn, checkOut, category, orderDates.length]);
+    setOrderDates((current) => {
+      const next = current.filter((date) => reservationDays.includes(date));
+      return next.length === current.length ? current : next;
+    });
+  }, [checkIn, checkOut, category, reservationDays]);
   useEffect(() => {
     if (!validDateRange(checkIn, checkOut)) {
       setRemaining({});
@@ -362,7 +414,20 @@ export function QuoteClient({
     return () => controller.abort();
   }, [checkIn, checkOut]);
 
+  function stockLeft(lines: CartLine[], propertyId: number, exceptLineId?: string) {
+    const available = remaining[propertyId];
+    if (available === undefined) return 50;
+    const used = lines
+      .filter((line) => line.property_id === propertyId && line.lineId !== exceptLineId)
+      .reduce((sum, line) => sum + line.quantity, 0);
+    return Math.max(0, available - used);
+  }
+  function resumeQuoteDraft() {
+    releaseSentQuoteDraft();
+  }
   function add(item: CatalogItem) {
+    if (stockLeft(cart, item.id) < 1) return;
+    resumeQuoteDraft();
     if (item.category === "restaurant") {
       const dates = normalizeDates(
         orderDates.length ? orderDates : undefined,
@@ -384,7 +449,7 @@ export function QuoteClient({
       if (same)
         setCart((old) =>
           old.map((line) =>
-            line.lineId === same.lineId
+            line.lineId === same.lineId && stockLeft(old, item.id, line.lineId) >= 1
               ? { ...line, quantity: line.quantity + 1 }
               : line,
           ),
@@ -411,15 +476,14 @@ export function QuoteClient({
     );
   }
   function changeQty(lineId: string, direction: number) {
+    resumeQuoteDraft();
     setCart((old) =>
       old.map((line) => {
         if (line.lineId !== lineId) return line;
-        const available = remaining[line.property_id];
-        const max = available !== undefined ? Math.max(1, available) : 50;
-        return {
-          ...line,
-          quantity: Math.max(1, Math.min(max, line.quantity + direction)),
-        };
+        const next = line.quantity + direction;
+        if (next < 1) return line;
+        if (next > stockLeft(old, line.property_id, line.lineId)) return line;
+        return { ...line, quantity: next };
       }),
     );
   }
@@ -445,16 +509,18 @@ export function QuoteClient({
   function clearRestaurantStaging() {
     setActiveRestaurantLine(null);
     setMealTypes(["dinner"]);
-    setOrderDates(checkIn ? [checkIn] : []);
+    setOrderDates([]);
     setOrderTime("");
     setParentItemName("");
   }
   function removeLine(lineId: string) {
+    resumeQuoteDraft();
     setCart((old) => old.filter((line) => line.lineId !== lineId));
     if (activeRestaurantLine === lineId) clearRestaurantStaging();
   }
   function updateActiveRestaurantLine() {
     if (!activeRestaurantLine) return;
+    resumeQuoteDraft();
     setCart((old) => {
       const active = old.find((line) => line.lineId === activeRestaurantLine);
       if (!active) return old;
@@ -519,7 +585,7 @@ export function QuoteClient({
           message,
           checkIn: checkIn || null,
           checkOut: checkOut || null,
-          people,
+          ...(people === "" ? {} : { people }),
         }),
       });
       const data = await response.json();
@@ -528,7 +594,9 @@ export function QuoteClient({
           data.error ||
             tr(locale, "Analyse indisponible.", "Analysis unavailable."),
         );
-      setAssistantResult(data as QuoteAssistantResult);
+      const result = data as QuoteAssistantResult;
+      setAssistantResult(result);
+      if (result.canApply) applyAssistantSelection(result);
     } catch (err) {
       setAssistantResult(null);
       setError(
@@ -540,9 +608,10 @@ export function QuoteClient({
       setAssistantBusy(false);
     }
   }
-  function applyAssistantResult() {
-    if (!assistantResult) return;
-    const incoming = assistantResult.lines
+  function applyAssistantSelection(result: QuoteAssistantResult) {
+    resumeQuoteDraft();
+    if (result.people != null) setPeople(result.people);
+    const incoming = result.lines
       .map((line) => {
         const item = items.find((entry) => entry.id === line.catalogItemId);
         if (!item) return null;
@@ -570,7 +639,10 @@ export function QuoteClient({
         if (existingIndex >= 0)
           next[existingIndex] = {
             ...next[existingIndex],
-            quantity: next[existingIndex].quantity + line.quantity,
+            quantity: line.quantity,
+            order_dates: line.order_dates || next[existingIndex].order_dates,
+            order_time: line.order_time || next[existingIndex].order_time,
+            meal_types: line.meal_types || next[existingIndex].meal_types,
           };
         else next.push(line);
       }
@@ -583,11 +655,15 @@ export function QuoteClient({
       );
     setAssistantApplied(true);
   }
+  function applyAssistantResult() {
+    if (!assistantResult) return;
+    applyAssistantSelection(assistantResult);
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError("");
-    if (!validDateRange(checkIn, checkOut)) {
+    if (checkIn && checkOut && !validDateRange(checkIn, checkOut)) {
       setError(
         tr(locale, "Sélectionnez des dates valides.", "Select valid dates."),
       );
@@ -613,16 +689,22 @@ export function QuoteClient({
       );
       return;
     }
-    for (const { item, line } of cartItems)
-      if (
-        remaining[item.id] !== undefined &&
-        remaining[item.id] < line.quantity
-      ) {
+    const demanded = new Map<number, { nameFr: string; nameEn: string; quantity: number }>();
+    for (const { item, line } of cartItems) {
+      const current = demanded.get(item.id);
+      demanded.set(item.id, {
+        nameFr: item.nameFr,
+        nameEn: item.nameEn,
+        quantity: (current?.quantity || 0) + line.quantity,
+      });
+    }
+    for (const [itemId, demand] of demanded)
+      if (remaining[itemId] !== undefined && remaining[itemId] < demand.quantity) {
         setError(
           tr(
             locale,
-            `${item.nameFr} n'est pas disponible à ces dates.`,
-            `${item.nameEn} is unavailable on these dates.`,
+            `${demand.nameFr} n'est pas disponible à ces dates.`,
+            `${demand.nameEn} is unavailable on these dates.`,
           ),
         );
         return;
@@ -634,14 +716,16 @@ export function QuoteClient({
       const selectedItems = cartItems.map(({ line, item }) => ({
         property_id: line.property_id,
         quantity: line.quantity,
-        check_in: checkIn,
-        check_out: checkOut,
+        ...(checkIn ? { check_in: checkIn } : {}),
+        ...(checkOut ? { check_out: checkOut } : {}),
         ...(item.category === "restaurant"
           ? {
-              dates: line.order_dates?.length ? line.order_dates : [checkIn],
+              dates: line.order_dates?.length ? line.order_dates : checkIn ? [checkIn] : undefined,
               order_dates: line.order_dates?.length
                 ? line.order_dates
-                : [checkIn],
+                : checkIn
+                  ? [checkIn]
+                  : undefined,
               order_time: line.order_time || undefined,
               meal_types: line.meal_types?.length
                 ? line.meal_types
@@ -661,9 +745,9 @@ export function QuoteClient({
           locale,
           requestKind,
           selectedItems,
-          checkIn,
-          checkOut,
-          people,
+          checkIn: checkIn || null,
+          checkOut: checkOut || null,
+          people: people === "" ? null : people,
           message,
           budget: budget ? Number(budget) : null,
         }),
@@ -671,7 +755,8 @@ export function QuoteClient({
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Erreur d'envoi.");
       saveQuoteContact({ name, email, phone, company });
-      clearQuoteDraft();
+      markSentQuoteDraft();
+      clearSentSelection();
       setResult(data);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
@@ -681,11 +766,20 @@ export function QuoteClient({
     }
   }
 
+  useEffect(() => {
+    if (member !== false) return;
+    const next = `${pathname}${search.toString() ? `?${search}` : ""}`;
+    router.replace(signInHref(next));
+  }, [member, pathname, search, router]);
+
+  if (member !== true && !result) return <div className="loading-center"><Loader2 className="spin" size={30}/></div>;
+
   if (result)
     return (
       <main>
         <section className="page-content">
           <div className="container">
+            <PageBack tone="ink" />
             <div className="success-box">
               <div className="success-icon">
                 <Check size={33} />
@@ -731,6 +825,7 @@ export function QuoteClient({
     <main>
       <section className="page-content">
         <div className="container">
+          <PageBack tone="ink" />
           <div className="page-intro">
             <div className="eyebrow">
               <span className="eyebrow-line" />
@@ -876,7 +971,7 @@ export function QuoteClient({
                             </div>
                             <button
                               type="button"
-                              disabled={available === 0}
+                              disabled={available === 0 || stockLeft(cart, item.id) < 1}
                               onClick={() => add(item)}
                               aria-label="Ajouter"
                             >
@@ -928,8 +1023,8 @@ export function QuoteClient({
                             <span>
                               {tr(
                                 locale,
-                                "JOUR(S) DE COMMANDE",
-                                "ORDER DAY(S)",
+                                "JOUR(S) DE COMMANDE (OPTIONNEL)",
+                                "ORDER DAY(S) (OPTIONAL)",
                               )}
                             </span>
                             {reservationDays.map((date) => (
@@ -946,7 +1041,7 @@ export function QuoteClient({
                         ) : (
                           <label className="field quote-inline-time">
                             <span>
-                              {tr(locale, "DATE DE COMMANDE", "ORDER DATE")}
+                              {tr(locale, "DATE DE COMMANDE (OPTIONNEL)", "ORDER DATE (OPTIONAL)")}
                             </span>
                             <input
                               type="date"
@@ -1006,17 +1101,16 @@ export function QuoteClient({
                     <span>
                       {tr(
                         locale,
-                        "DATE DE DÉBUT / ARRIVÉE",
-                        "START / CHECK-IN DATE",
-                      )}{" "}
-                      *
+                        "DATE DE DÉBUT / ARRIVÉE (OPTIONNEL)",
+                        "START / CHECK-IN DATE (OPTIONAL)",
+                      )}
                     </span>
                     <input
                       type="date"
-                      required
                       min={today}
                       value={checkIn}
                       onChange={(e) => {
+                        resumeQuoteDraft();
                         setCheckIn(e.target.value);
                         if (checkOut && checkOut <= e.target.value)
                           setCheckOut("");
@@ -1027,37 +1121,42 @@ export function QuoteClient({
                     <span>
                       {tr(
                         locale,
-                        "DATE DE FIN / DÉPART",
-                        "END / CHECK-OUT DATE",
-                      )}{" "}
-                      *
+                        "DATE DE FIN / DÉPART (OPTIONNEL)",
+                        "END / CHECK-OUT DATE (OPTIONAL)",
+                      )}
                     </span>
                     <input
                       type="date"
-                      required
                       min={checkIn || today}
                       value={checkOut}
-                      onChange={(e) => setCheckOut(e.target.value)}
+                      onChange={(e) => {
+                        resumeQuoteDraft();
+                        setCheckOut(e.target.value);
+                      }}
                     />
                   </label>
                   <label className="field">
                     <span>
-                      {tr(locale, "NOMBRE DE PERSONNES", "NUMBER OF GUESTS")} *
+                      {tr(locale, "NOMBRE DE PERSONNES (OPTIONNEL)", "NUMBER OF GUESTS (OPTIONAL)")}
                     </span>
                     <input
                       type="number"
-                      required
                       min={1}
                       max={peopleMax > 0 ? peopleMax : 1000}
                       value={people}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        resumeQuoteDraft();
+                        if (e.target.value === "") {
+                          setPeople("");
+                          return;
+                        }
                         setPeople(
                           Math.min(
                             peopleMax > 0 ? peopleMax : 1000,
                             Number(e.target.value),
                           ),
-                        )
-                      }
+                        );
+                      }}
                     />
                     {peopleMax > 0 && (
                       <small className="field-hint">
@@ -1082,7 +1181,10 @@ export function QuoteClient({
                       min={0}
                       placeholder="Ex : 500000"
                       value={budget}
-                      onChange={(e) => setBudget(e.target.value)}
+                      onChange={(e) => {
+                        resumeQuoteDraft();
+                        setBudget(e.target.value);
+                      }}
                     />
                   </label>
                   <label className="field full">
@@ -1097,6 +1199,7 @@ export function QuoteClient({
                       maxLength={4000}
                       value={message}
                       onChange={(e) => {
+                        resumeQuoteDraft();
                         setMessage(e.target.value);
                         setAssistantResult(null);
                         setAssistantApplied(false);
@@ -1154,18 +1257,20 @@ export function QuoteClient({
                           )}
                         </strong>
                         <ul>
-                          {assistantResult.lines.map((line, index) => (
+                          {assistantResult.lines.map((line, index) => {
+                            const item = items.find((entry) => entry.id === line.catalogItemId);
+                            const mealLabels = line.mealTypes?.map((meal) => meals.find((entry) => entry[0] === meal)?.[locale === "en" ? 2 : 1] || meal).join(" · ");
+                            return (
                             <li key={`${line.requestedLabel}-${index}`}>
-                              {line.quantity} × {line.requestedLabel}
+                              {line.quantity} × {item ? (locale === "en" ? item.nameEn : item.nameFr) : line.requestedLabel}
                               {line.dates?.length
                                 ? ` · ${line.dates.join(", ")}`
                                 : ""}
-                              {line.mealTypes?.length
-                                ? ` · ${line.mealTypes.join(" · ")}`
-                                : ""}
+                              {mealLabels ? ` · ${mealLabels}` : ""}
                               {line.orderTime ? ` · ${line.orderTime}` : ""}
                             </li>
-                          ))}
+                            );
+                          })}
                         </ul>
                         {assistantResult.questions.length > 0 && (
                           <div className="assistant-questions">
@@ -1438,7 +1543,7 @@ export function QuoteClient({
                             className="quote-config-chip"
                             onClick={() => loadRestaurantLine(line)}
                           >
-                            {line.meal_types?.join(" · ") ||
+                            {line.meal_types?.map((meal) => meals.find((entry) => entry[0] === meal)?.[locale === "en" ? 2 : 1] || meal).join(" · ") ||
                               tr(locale, "Configurer", "Configure")}{" "}
                             {line.order_dates?.length
                               ? ` · ${line.order_dates.join(", ")}`
@@ -1450,6 +1555,7 @@ export function QuoteClient({
                           <button
                             type="button"
                             onClick={() => changeQty(line.lineId, -1)}
+                            disabled={line.quantity <= 1}
                           >
                             <Minus size={12} />
                           </button>
@@ -1457,6 +1563,7 @@ export function QuoteClient({
                           <button
                             type="button"
                             onClick={() => changeQty(line.lineId, 1)}
+                            disabled={line.quantity >= stockLeft(cart, line.property_id, line.lineId)}
                           >
                             <Plus size={12} />
                           </button>

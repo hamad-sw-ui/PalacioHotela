@@ -55,16 +55,40 @@ export const EMPTY_QUOTE_DRAFT: QuoteDraft = {
 };
 
 const STORAGE_KEY = "quote_draft";
+const SENT_KEY = "quote_draft_sent";
 const CONTACT_KEY = "quote_last_contact";
+
+export type QuoteDraftStore = {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+};
 
 export function normalizeRestaurantOrderDates(orderDates?: string[], fallback?: string) {
   return [...new Set([...(orderDates || []), ...(fallback ? [fallback] : [])].filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date)))].sort();
 }
 
-export function getQuoteDraft(): QuoteDraft {
-  if (typeof window === "undefined") return structuredClone(EMPTY_QUOTE_DRAFT);
+export function quoteDraftHasLines(draft: QuoteDraft) {
+  return draft.accommodationLines.length + draft.roomLines.length + draft.serviceLines.length + draft.restaurantLines.length > 0;
+}
+
+export function quoteDraftWasSent(storage: QuoteDraftStore) {
+  return storage.getItem(SENT_KEY) === "1";
+}
+
+export function markQuoteDraftSent(storage: QuoteDraftStore) {
+  storage.setItem(SENT_KEY, "1");
+  storage.removeItem(STORAGE_KEY);
+}
+
+export function releaseQuoteDraft(storage: QuoteDraftStore) {
+  storage.removeItem(SENT_KEY);
+}
+
+export function readQuoteDraft(storage: QuoteDraftStore): QuoteDraft {
+  if (quoteDraftWasSent(storage)) return structuredClone(EMPTY_QUOTE_DRAFT);
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = storage.getItem(STORAGE_KEY);
     if (!raw) return structuredClone(EMPTY_QUOTE_DRAFT);
     const value = JSON.parse(raw) as Partial<QuoteDraft>;
     return {
@@ -79,8 +103,34 @@ export function getQuoteDraft(): QuoteDraft {
   }
 }
 
+export function writeQuoteDraft(storage: QuoteDraftStore, draft: QuoteDraft) {
+  if (quoteDraftWasSent(storage)) {
+    storage.removeItem(STORAGE_KEY);
+    return;
+  }
+  storage.setItem(STORAGE_KEY, JSON.stringify(draft));
+}
+
+export function markSentQuoteDraft() {
+  if (typeof window !== "undefined") markQuoteDraftSent(window.localStorage);
+}
+
+export function quoteWasSent() {
+  return typeof window !== "undefined" && quoteDraftWasSent(window.localStorage);
+}
+
+export function releaseSentQuoteDraft() {
+  if (typeof window !== "undefined") releaseQuoteDraft(window.localStorage);
+}
+
+export function getQuoteDraft(): QuoteDraft {
+  if (typeof window === "undefined") return structuredClone(EMPTY_QUOTE_DRAFT);
+  return readQuoteDraft(window.localStorage);
+}
+
 export function setQuoteDraft(draft: QuoteDraft) {
-  if (typeof window !== "undefined") window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+  if (typeof window === "undefined") return;
+  writeQuoteDraft(window.localStorage, draft);
 }
 
 export function clearQuoteDraft() {

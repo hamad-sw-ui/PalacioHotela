@@ -1,9 +1,10 @@
 import { eq } from "drizzle-orm";
-import { z } from "zod";
 import { db } from "@/db";
 import { users } from "@/db/schema";
+import { authBodySchema, normalizeAuthBody } from "@/lib/auth-body";
 import { clearSession, createSessionToken, getCurrentUser, hashPassword, setSession, verifyPassword } from "@/lib/auth";
-import { logActivity } from "@/lib/hotel";
+import { googleAuthConfigured, googleEnvFromSettings } from "@/lib/google-auth";
+import { getSettings, logActivity } from "@/lib/hotel";
 import { ensureAdminAccount, ensureSeeded } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
@@ -11,13 +12,11 @@ export const dynamic = "force-dynamic";
 const publicUser = (user: { id: number; fullName: string; email: string; phone?: string | null; role: string; locale: string }) => ({ id: user.id, fullName: user.fullName, email: user.email, phone: user.phone || "", role: user.role, locale: user.locale });
 const noStore = { "Cache-Control": "no-store" };
 
-// Tolerates stray spaces or capitals that browsers, keyboards and copy-paste can introduce.
-const emailField = z.preprocess((value) => typeof value === "string" ? value.trim().toLowerCase() : value, z.email().max(255));
-
 export async function GET() {
   const user = await getCurrentUser();
   // A fresh token lets a cookie-based session also authenticate with the bearer fallback.
-  return Response.json({ user: user ? publicUser(user) : null, token: user ? createSessionToken(user.id) : null }, { headers: noStore });
+  const google = googleAuthConfigured(googleEnvFromSettings(await getSettings()));
+  return Response.json({ user: user ? publicUser(user) : null, token: user ? createSessionToken(user.id) : null, google }, { headers: noStore });
 }
 
 export async function POST(request: Request) {
@@ -27,7 +26,7 @@ export async function POST(request: Request) {
     if (body?.action === "logout") { await clearSession(); return Response.json({ ok: true }, { headers: noStore }); }
     await ensureSeeded();
     await ensureAdminAccount();
-    const parsed = z.object({ action: z.enum(["login", "register"]), email: emailField, password: z.string().min(1).max(200), fullName: z.string().trim().min(2).max(180).optional(), phone: z.string().trim().min(6).max(60).optional(), country: z.string().trim().min(2).max(120).optional(), locale: z.enum(["fr", "en"]).optional() }).parse(body);
+    const parsed = authBodySchema.parse(normalizeAuthBody(body));
     if (parsed.action === "register") {
       if (!parsed.fullName) return Response.json({ error: "Le nom est requis." }, { status: 400 });
       if (!parsed.country) return Response.json({ error: "Le pays est requis." }, { status: 400 });

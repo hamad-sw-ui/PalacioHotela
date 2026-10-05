@@ -1,7 +1,8 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { catalogItems, contentPages, siteSettings, users } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/auth";
+import { demoCatalogFeatures } from "@/lib/catalog-features";
 
 let seeded = false;
 let pending: Promise<void> | null = null;
@@ -38,7 +39,166 @@ BEGIN
   END LOOP;
 END $$;`;
 
+const ADD_QUOTE_HEADER_SQL = `
+DO $$
+BEGIN
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'quote_header_image_url'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN quote_header_image_url text NOT NULL DEFAULT '';
+  END IF;
+  IF to_regclass('quote_requests') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'quote_requests' AND column_name = 'header_image_url'
+  ) THEN
+    ALTER TABLE quote_requests ADD COLUMN header_image_url text;
+  END IF;
+  IF to_regclass('contact_messages') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'contact_messages' AND column_name = 'reply'
+  ) THEN
+    ALTER TABLE contact_messages ADD COLUMN reply text;
+  END IF;
+  IF to_regclass('contact_messages') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'contact_messages' AND column_name = 'replied_at'
+  ) THEN
+    ALTER TABLE contact_messages ADD COLUMN replied_at timestamp with time zone;
+  END IF;
+  IF to_regclass('quote_requests') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'quote_requests' AND column_name = 'theme_snapshot'
+  ) THEN
+    ALTER TABLE quote_requests ADD COLUMN theme_snapshot varchar(24);
+  END IF;
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'theme_colors'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN theme_colors jsonb;
+  END IF;
+  IF to_regclass('quote_requests') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'quote_requests' AND column_name = 'theme_palette_snapshot'
+  ) THEN
+    ALTER TABLE quote_requests ADD COLUMN theme_palette_snapshot jsonb;
+  END IF;
+  IF to_regclass('quote_requests') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'quote_requests' AND column_name = 'logo_snapshot'
+  ) THEN
+    ALTER TABLE quote_requests ADD COLUMN logo_snapshot text;
+  END IF;
+  IF to_regclass('quote_requests') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'quote_requests' AND column_name = 'tertiary_logo_snapshot'
+  ) THEN
+    ALTER TABLE quote_requests ADD COLUMN tertiary_logo_snapshot text;
+  END IF;
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'secondary_logo_url'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN secondary_logo_url text NOT NULL DEFAULT '';
+  END IF;
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'tertiary_logo_url'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN tertiary_logo_url text NOT NULL DEFAULT '';
+  END IF;
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'quote_logo_variant'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN quote_logo_variant varchar(16) NOT NULL DEFAULT 'primary';
+  END IF;
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'instagram_url'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN instagram_url text NOT NULL DEFAULT '';
+  END IF;
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'smtp_host'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN smtp_host text NOT NULL DEFAULT '';
+    ALTER TABLE site_settings ADD COLUMN smtp_port integer NOT NULL DEFAULT 587;
+    ALTER TABLE site_settings ADD COLUMN smtp_secure boolean NOT NULL DEFAULT false;
+    ALTER TABLE site_settings ADD COLUMN smtp_require_tls boolean NOT NULL DEFAULT true;
+    ALTER TABLE site_settings ADD COLUMN smtp_user text NOT NULL DEFAULT '';
+    ALTER TABLE site_settings ADD COLUMN smtp_password text NOT NULL DEFAULT '';
+    ALTER TABLE site_settings ADD COLUMN smtp_from text NOT NULL DEFAULT '';
+  END IF;
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'ai_api_key'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN ai_api_key text NOT NULL DEFAULT '';
+  END IF;
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'stripe_secret_key'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN stripe_secret_key text NOT NULL DEFAULT '';
+  END IF;
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'stripe_webhook_secret'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN stripe_webhook_secret text NOT NULL DEFAULT '';
+  END IF;
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'paypal_client_id'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN paypal_client_id text NOT NULL DEFAULT '';
+  END IF;
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'paypal_client_secret'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN paypal_client_secret text NOT NULL DEFAULT '';
+  END IF;
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'paypal_env'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN paypal_env varchar(16) NOT NULL DEFAULT 'sandbox';
+  END IF;
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'paypal_xaf_per_eur'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN paypal_xaf_per_eur double precision NOT NULL DEFAULT 655.957;
+  END IF;
+  IF to_regclass('quote_requests') IS NOT NULL AND EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'quote_requests' AND column_name = 'people' AND is_nullable = 'NO'
+  ) THEN
+    ALTER TABLE quote_requests ALTER COLUMN people DROP NOT NULL;
+    ALTER TABLE quote_requests ALTER COLUMN people DROP DEFAULT;
+  END IF;
+  IF to_regclass('catalog_items') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'catalog_items' AND column_name = 'images'
+  ) THEN
+    ALTER TABLE catalog_items ADD COLUMN images jsonb NOT NULL DEFAULT '[]'::jsonb;
+  END IF;
+  IF to_regclass('catalog_items') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'catalog_items' AND column_name = 'features'
+  ) THEN
+    ALTER TABLE catalog_items ADD COLUMN features jsonb NOT NULL DEFAULT '[]'::jsonb;
+  END IF;
+  IF to_regclass('bookings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'bookings' AND column_name = 'refund_ref'
+  ) THEN
+    ALTER TABLE bookings ADD COLUMN refund_ref text;
+  END IF;
+  IF to_regclass('bookings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'bookings' AND column_name = 'refund_error'
+  ) THEN
+    ALTER TABLE bookings ADD COLUMN refund_error text;
+  END IF;
+  IF to_regclass('users') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'users' AND column_name = 'google_sub'
+  ) THEN
+    ALTER TABLE users ADD COLUMN google_sub varchar(255);
+  END IF;
+  IF to_regclass('users') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM pg_indexes WHERE schemaname = current_schema() AND indexname = 'users_google_sub_unique'
+  ) THEN
+    CREATE UNIQUE INDEX users_google_sub_unique ON users (google_sub);
+  END IF;
+END $$;
+UPDATE quote_requests
+SET theme_snapshot = COALESCE((SELECT theme FROM site_settings WHERE id = 1), 'forest')
+WHERE theme_snapshot IS NULL
+  AND status IN ('quote_sent', 'negotiating', 'accepted', 'rejected', 'expired');`;
+
 async function seed() {
+  try { await db.execute(sql.raw(ADD_QUOTE_HEADER_SQL)); } catch (error) {
+    if (process.env.NODE_ENV !== "development") console.error("[Palacio] Quote header column migration failed:", error);
+  }
   try { await db.execute(sql.raw(REPAIR_SETTINGS_SQL)); } catch (error) {
     if (process.env.NODE_ENV !== "development") console.error("[Palacio] Settings schema repair failed:", error);
   }
@@ -56,6 +216,9 @@ async function seed() {
       { slug: "table-palacio", category: "restaurant", nameFr: "La Table du Palacio", nameEn: "Palacio Dining", descriptionFr: "Une cuisine de saison qui met à l’honneur les saveurs du Cameroun et d’ailleurs.", descriptionEn: "Seasonal cuisine celebrating the flavours of Cameroon and beyond.", image: "/images/palacio-dining.jpg", price: 32000, pricingUnit: "person", capacity: 2, inventory: 40, amenitiesFr: ["Cuisine locale", "Terrasse", "Menu dégustation"], amenitiesEn: ["Local cuisine", "Terrace", "Tasting menu"], featured: true },
       { slug: "escapade-douala", category: "service", nameFr: "Escapade à Douala", nameEn: "Discover Douala", descriptionFr: "Laissez notre conciergerie vous dévoiler les plus belles adresses de la ville.", descriptionEn: "Let our concierge reveal the most beautiful corners of the city.", image: "/images/palacio-hero.jpg", price: 38000, pricingUnit: "person", capacity: 4, inventory: 8, amenitiesFr: ["Guide local", "Transport inclus", "Sur mesure"], amenitiesEn: ["Local guide", "Transport included", "Tailored experience"] },
     ]).onConflictDoNothing();
+  }
+  for (const [slug, features] of Object.entries(demoCatalogFeatures)) {
+    await db.update(catalogItems).set({ features }).where(and(eq(catalogItems.slug, slug), sql`jsonb_array_length(${catalogItems.features}) = 0`));
   }
   const page = await db.select({ id: contentPages.id }).from(contentPages).limit(1);
   if (!page.length) {

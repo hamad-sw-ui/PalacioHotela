@@ -4,8 +4,9 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf
 import type { HotelSettings, QuoteRequest } from "@/db/schema";
 import { formatXaf } from "@/lib/format";
 import { containInBox } from "@/lib/pdf-image-fit";
+import { resolveQuoteHeaderImage } from "@/lib/quote-header";
 import { buildQuoteDocumentModel } from "@/lib/quote-document-model";
-import { getQuotePdfPalette } from "@/lib/quote-pdf-theme";
+import { mergePalette } from "@/lib/quote-pdf-theme";
 
 const clean = (value: unknown) => String(value ?? "").replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/[\u2013\u2014]/g, "-").replace(/\u0153/g, "oe").replace(/[^\x20-\xFF]/g, " ");
 
@@ -35,7 +36,7 @@ async function embedAsset(pdf: PDFDocument, url: string | null | undefined) {
  */
 export async function buildQuotePdfV3(quote: QuoteRequest, settings: HotelSettings, kind: "receipt" | "quote") {
   const model = buildQuoteDocumentModel(quote, settings, kind);
-  const theme = getQuotePdfPalette(settings.theme);
+  const theme = mergePalette(settings.theme, settings.themeColors);
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -52,10 +53,12 @@ export async function buildQuotePdfV3(quote: QuoteRequest, settings: HotelSettin
   let page = pdf.addPage([width, height]);
   let y = height - 48;
 
-  const logo = await embedAsset(pdf, settings.logoUrl);
+  const headerImage = await embedAsset(pdf, resolveQuoteHeaderImage(quote, settings));
+  const plate = headerImage ? null : (await embedAsset(pdf, settings.tertiaryLogoUrl) || await embedAsset(pdf, settings.logoUrl));
+  const logoPlate = rgb(1, 1, 1);
   const clientSignature = await embedAsset(pdf, quote.clientSignatureUrl);
-  const adminSignature = await embedAsset(pdf, quote.adminSignatureUrl || settings.quoteSignatureUrl);
-  const adminStamp = await embedAsset(pdf, quote.adminStampUrl || settings.quoteStampUrl);
+  const adminSignature = await embedAsset(pdf, quote.adminSignatureUrl);
+  const adminStamp = await embedAsset(pdf, quote.adminStampUrl);
 
   const newPage = () => { page = pdf.addPage([width, height]); y = height - 48; };
   const room = (space: number) => { if (y - space < 58) newPage(); };
@@ -77,22 +80,42 @@ export async function buildQuotePdfV3(quote: QuoteRequest, settings: HotelSettin
     }
   };
 
-  if (logo) {
-    const scale = Math.min(92 / logo.width, 36 / logo.height);
-    page.drawImage(logo, { x: left, y: y - 28, width: logo.width * scale, height: logo.height * scale });
+  if (headerImage) {
+    const box = { x: left, y: y - 72, width: right - left, height: 72 };
+    page.drawImage(headerImage, containInBox(headerImage, box));
+    y = box.y - 16;
   } else {
-    page.drawRectangle({ x: left, y: y - 30, width: 34, height: 34, color: primary });
-    page.drawText("P", { x: left + 11, y: y - 18, size: 16, font: bold, color: rgb(1, 1, 1) });
+    const square = 96;
+    const headerTop = y;
+    const ruleY = headerTop - square;
+    const textX = left + square + 16;
+    const title = clean(kind === "receipt" ? (isEn ? "ACKNOWLEDGEMENT" : "ACCUSÉ") : (isEn ? "QUOTE" : "DEVIS"));
+    const reference = clean(model.reference);
+    const dated = new Date(model.createdAt).toLocaleDateString(isEn ? "en-GB" : "fr-FR");
+    const contacts = [model.hotel.address, model.hotel.phone, model.hotel.email].filter(Boolean).map((value) => clean(value));
+    const nameY = headerTop - 22;
+    const lastY = ruleY + 16;
+    const contactTop = nameY - 20;
+    const step = contacts.length > 1 ? (contactTop - lastY) / (contacts.length - 1) : 0;
+    const placeRight = (value: string, size: number, font: PDFFont, top: number, paint = ink) => page.drawText(value, { x: right - textWidth(value, size, font), y: top, size, font, color: paint });
+    page.drawRectangle({ x: left, y: ruleY, width: square, height: square, color: logoPlate });
+    if (plate) {
+      const inset = 12;
+      page.drawImage(plate, containInBox(plate, { x: left + inset, y: ruleY + inset, width: square - inset * 2, height: square - inset * 2 }));
+    } else {
+      const mark = (clean(model.hotel.name).trim().charAt(0) || "P").toUpperCase();
+      const markSize = 32;
+      page.drawText(mark, { x: left + (square - textWidth(mark, markSize, bold)) / 2, y: ruleY + (square - markSize) / 2 + 6, size: markSize, font: bold, color: primary });
+    }
+    const titleWidth = textWidth(title, 16, bold);
+    page.drawText(clean(model.hotel.name), { x: textX, y: nameY, size: 15, font: bold, color: primary, maxWidth: Math.max(90, right - titleWidth - 18 - textX) });
+    contacts.forEach((line, index) => page.drawText(line, { x: textX, y: contactTop - index * step, size: 9, font: regular, color: muted }));
+    placeRight(title, 16, bold, nameY, primary);
+    placeRight(reference, 9, regular, contacts.length ? contactTop - step * Math.floor((contacts.length - 1) / 2) : nameY - 18);
+    placeRight(dated, 9, regular, lastY, muted);
+    page.drawLine({ start: { x: left, y: ruleY - 10 }, end: { x: right, y: ruleY - 10 }, thickness: 1, color: accent });
+    y = ruleY - 28;
   }
-  page.drawText(clean(model.hotel.name), { x: left + (logo ? 104 : 46), y: y - 4, size: 16, font: bold, color: primary });
-  page.drawText(clean(kind === "receipt" ? (isEn ? "ACKNOWLEDGEMENT" : "ACCUSÉ") : (isEn ? "QUOTE" : "DEVIS")), { x: 430, y: y - 2, size: 18, font: bold, color: primary });
-  page.drawText(clean(model.reference), { x: 430, y: y - 20, size: 9, font: regular, color: ink });
-  page.drawText(new Date(model.createdAt).toLocaleDateString(isEn ? "en-GB" : "fr-FR"), { x: 430, y: y - 33, size: 9, font: regular, color: muted });
-  y -= 46;
-  draw([model.hotel.address, model.hotel.phone, model.hotel.email].filter(Boolean).join("  ·  "), left, 8, regular, muted, 360);
-  y -= 6;
-  page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 1.2, color: accent });
-  y -= 24;
 
   const columnTop = y;
   page.drawText(isEn ? "CLIENT" : "CLIENT", { x: left, y, size: 8, font: bold, color: accent });
@@ -103,7 +126,8 @@ export async function buildQuotePdfV3(quote: QuoteRequest, settings: HotelSettin
   page.drawText(clean(model.project.kind.replaceAll("_", " ")), { x: 320, y, size: 11, font: bold, color: ink });
   y -= 15;
   page.drawText(clean(model.client.company || model.client.email), { x: left, y, size: 8, font: regular, color: muted });
-  page.drawText(clean(`${period}  ·  ${model.project.people} ${isEn ? "guests" : "personnes"}`), { x: 320, y, size: 8, font: regular, color: muted });
+  const guests = model.project.people == null ? (isEn ? "Guests to confirm" : "Nombre de personnes à confirmer") : `${model.project.people} ${isEn ? "guests" : "personnes"}`;
+  page.drawText(clean(`${period}  ·  ${guests}`), { x: 320, y, size: 8, font: regular, color: muted });
   y -= 13;
   page.drawText(clean(model.client.company ? `${model.client.email}  ·  ${model.client.phone}` : model.client.phone), { x: left, y, size: 8, font: regular, color: muted });
   y = Math.min(y, columnTop - 58);
@@ -156,8 +180,10 @@ export async function buildQuotePdfV3(quote: QuoteRequest, settings: HotelSettin
   signatureLine(page, 330, y, 170);
   if (clientSignature) page.drawImage(clientSignature, { x: left, y: y - 40, width: Math.min(120, clientSignature.width), height: 32 });
   if (adminSignature) page.drawImage(adminSignature, { x: 330, y: y - 40, width: Math.min(110, adminSignature.width), height: 30 });
+  else page.drawText(clean(isEn ? "Awaiting hotel signature" : "Signature de l'hôtel en attente"), { x: 330, y: y - 25, size: 7, font: regular, color: muted });
   page.drawText(clean(model.signatures.clientName || model.client.name), { x: left, y: y - 60, size: 8, font: regular, color: muted });
-  page.drawText(clean([model.signatures.adminName, model.signatures.adminRole].filter(Boolean).join(" · ")), { x: 330, y: y - 60, size: 8, font: regular, color: muted, maxWidth: stampBox.x - 338 });
+  const adminCaption = [model.signatures.adminName, model.signatures.adminRole].filter(Boolean).join(" · ");
+  if (adminCaption) page.drawText(clean(adminCaption), { x: 330, y: y - 60, size: 8, font: regular, color: muted, maxWidth: stampBox.x - 338 });
   if (adminStamp) page.drawImage(adminStamp, { ...containInBox(adminStamp, stampBox) });
 
   const pages = pdf.getPages();

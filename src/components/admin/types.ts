@@ -1,7 +1,7 @@
 import type { Booking, CatalogItem, ContentPage, HotelSettings, QuoteRequest } from "@/db/schema";
 
 export type AdminUser = { id: number; fullName: string; email: string; phone: string | null; role: string; locale: string; active: boolean; createdAt: string };
-export type AdminMessage = { id: number; name: string; email: string; phone: string | null; subject: string; message: string; status: string; createdAt: string };
+export type AdminMessage = { id: number; name: string; email: string; phone: string | null; subject: string; message: string; reply: string | null; repliedAt: string | null; status: string; createdAt: string };
 export type AdminNotification = { id: number; type: string; title: string; message: string; href: string; read: boolean; createdAt: string };
 export type AdminActivity = { id: number; actorName: string; action: string; entity: string; entityId: number | null; details: string; createdAt: string };
 export type AdminData = {
@@ -15,7 +15,7 @@ export type AdminData = {
   notifications: AdminNotification[];
   activity: AdminActivity[];
   settings: HotelSettings;
-  integrations: { card: boolean; paypal: boolean; cash: boolean; paypalRate: number | null; smtp: boolean; aiApi: boolean; demoLogin: boolean };
+  integrations: { google: boolean; googleClientIdSet: boolean; googleClientSecretSet: boolean; card: boolean; paypal: boolean; cash: boolean; paypalRate: number | null; stripeRate: number; smtp: boolean; smtpPasswordSet: boolean; aiApi: boolean; aiApiKeySet: boolean; stripeSecretKeySet: boolean; stripeWebhookSecretSet: boolean; paypalClientIdSet: boolean; paypalClientSecretSet: boolean; demoLogin: boolean };
   stats: { bookings: number; pendingBookings: number; quotes: number; newQuotes: number; unread: number; messages: number };
 };
 export type Section = "overview" | "reservations" | "devis" | "catalogue" | "pages" | "utilisateurs" | "messages" | "notifications" | "activite" | "parametres";

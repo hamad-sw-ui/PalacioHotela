@@ -1,13 +1,20 @@
 export type Stay = { start: string; end: string; quantity: number };
 
+const stockQuoteStatuses = new Set(["new", "in_review", "quote_sent", "negotiating", "accepted"]);
+
+/** A request keeps its units until it is cancelled, refused or expired. */
+export function quoteOccupiesStock(status: string) {
+  return stockQuoteStatuses.has(status);
+}
+
 export function nextDay(iso: string) {
   const date = new Date(`${iso}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + 1);
   return date.toISOString().slice(0, 10);
 }
 
-/** Units still free on the busiest day of the requested stay. Checkout day is free. */
-export function remainingFromStays(inventory: number, requestStart: string, requestEnd: string, stays: Stay[]) {
+/** Highest number of units occupied at once. Checkout day is free. */
+export function peakFromStays(requestStart: string, requestEnd: string, stays: Stay[]) {
   const events: { day: string; delta: number }[] = [];
   for (const stay of stays) {
     const start = stay.start > requestStart ? stay.start : requestStart;
@@ -22,7 +29,28 @@ export function remainingFromStays(inventory: number, requestStart: string, requ
     current += event.delta;
     if (current > peak) peak = current;
   }
-  return Math.max(0, inventory - peak);
+  return peak;
+}
+
+/** Units still free on the busiest day of the requested stay. Checkout day is free. */
+export function remainingFromStays(inventory: number, requestStart: string, requestEnd: string, stays: Stay[]) {
+  return Math.max(0, inventory - peakFromStays(requestStart, requestEnd, stays));
+}
+
+/** Busiest overlap across every stay. Checkout day is free. */
+export function occupiedPeak(stays: Stay[]) {
+  if (!stays.length) return 0;
+  const start = stays.reduce((min, stay) => stay.start < min ? stay.start : min, stays[0].start);
+  const end = stays.reduce((max, stay) => stay.end > max ? stay.end : max, stays[0].end);
+  return peakFromStays(start, end, stays);
+}
+
+/** True when adding every incoming stay still fits the stock, including lines of the same item. */
+export function demandFits(inventory: number, incoming: Stay[], existing: Stay[] = []) {
+  if (!incoming.length) return true;
+  const start = incoming.reduce((min, stay) => stay.start < min ? stay.start : min, incoming[0].start);
+  const end = incoming.reduce((max, stay) => stay.end > max ? stay.end : max, incoming[0].end);
+  return peakFromStays(start, end, [...existing, ...incoming]) <= inventory;
 }
 
 export function demandRanges(line: { order_dates?: string[]; order_date?: string; check_in?: string; check_out?: string }, fallback?: { start?: string | null; end?: string | null }) {

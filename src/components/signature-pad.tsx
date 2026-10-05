@@ -19,7 +19,7 @@ export function SignaturePad({ onChange, clearLabel }: { onChange: (value: strin
     context.lineWidth = 2.4;
     context.lineCap = "round";
     context.lineJoin = "round";
-    context.strokeStyle = "#18382e";
+    context.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--deep").trim();
   }, []);
 
   function point(event: React.PointerEvent<HTMLCanvasElement>) {

@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   try {
     const input = quoteAssistantInputSchema.parse(await request.json());
     const [settings, catalog] = await Promise.all([getSettings(), getPublicCatalog()]);
-    const result = await analyzeQuoteMessage({ message: input.message, locale: input.locale, catalog, checkIn: input.checkIn, checkOut: input.checkOut, people: input.people, provider: settings.aiProvider, baseUrl: settings.aiBaseUrl, model: settings.aiModel });
+    const result = await analyzeQuoteMessage({ message: input.message, locale: input.locale, catalog, checkIn: input.checkIn, checkOut: input.checkOut, people: input.people, provider: settings.aiProvider, baseUrl: settings.aiBaseUrl, model: settings.aiModel, apiKey: settings.aiApiKey });
     return Response.json(result);
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Demande invalide." }, { status: 400 });

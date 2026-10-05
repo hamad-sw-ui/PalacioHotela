@@ -7,7 +7,16 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test:quote": "node --import tsx --test scripts/quote-regression.test.ts",
+    "test:quote": "node --import tsx --test scripts/quote-regression.test.ts scripts/quote-draft.test.ts",
+    "test:smtp": "node --import tsx --test scripts/smtp.test.ts",
+    "test:payments": "node --import tsx --test scripts/payments.test.ts scripts/booking-refund.test.ts",
+    "test:gallery": "node --import tsx --test scripts/catalog-gallery.test.ts",
+    "test:features": "node --import tsx --test scripts/catalog-features.test.ts",
+    "test:gate": "node --import tsx --test scripts/member-gate.test.ts",
+    "test:availability": "node --import tsx --test scripts/availability-search.test.ts",
+    "test:nav": "node --import tsx --test scripts/site-navigation.test.ts",
+    "test:google": "node --import tsx --test scripts/google-settings.test.ts",
+    "test:integrations": "node --import tsx --test scripts/integration-settings.test.ts",
     "test:quote:e2e": "node --import tsx --test scripts/quote-e2e.test.ts"
   },
   "dependencies": {

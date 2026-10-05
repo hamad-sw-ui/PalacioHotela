@@ -13,6 +13,7 @@ export async function GET(request: Request) {
   const [booking] = await db.select().from(bookings).where(eq(bookings.publicToken, token)).limit(1);
   if (!booking || booking.paymentMethod !== "paypal" || booking.paymentRef !== paypalOrderId || !booking.paymentAmount) return Response.redirect(new URL("/reservation?payment=invalid", url.origin), 303);
   if (booking.paymentStatus === "paid") return Response.redirect(destination, 303);
+  if (booking.status === "cancelled") { destination.searchParams.set("payment", "released"); return Response.redirect(destination, 303); }
   try {
     const success = await capturePayPalOrder(paypalOrderId, booking.paymentAmount);
     if (success) await markBookingPaid(booking);

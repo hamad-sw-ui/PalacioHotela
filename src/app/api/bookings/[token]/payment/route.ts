@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { bookings } from "@/db/schema";
+import { getSettings } from "@/lib/hotel";
 import { createPayPalOrder, createStripeCheckout, paymentConfiguration } from "@/lib/payments";
 
 export async function POST(request: Request, { params }: { params: Promise<{ token: string }> }) {
@@ -8,7 +9,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
   const [booking] = await db.select().from(bookings).where(eq(bookings.publicToken, token)).limit(1);
   if (!booking) return Response.json({ error: "Réservation introuvable." }, { status: 404 });
   if (booking.paymentStatus === "paid" || booking.status === "cancelled" || booking.paymentMethod === "cash") return Response.json({ error: "Ce paiement n'est plus disponible." }, { status: 400 });
-  const config = paymentConfiguration();
+  const config = paymentConfiguration(await getSettings());
   if (booking.paymentMethod === "card" && !config.card || booking.paymentMethod === "paypal" && !config.paypal) return Response.json({ error: "Service de paiement non configuré." }, { status: 503 });
   try {
     const payment = booking.paymentMethod === "card" ? await createStripeCheckout(booking, new URL(request.url).origin) : await createPayPalOrder(booking, new URL(request.url).origin);

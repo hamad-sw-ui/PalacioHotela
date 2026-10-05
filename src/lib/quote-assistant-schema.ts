@@ -15,14 +15,14 @@ export const quoteAssistantLineSchema = z.object({
   parentItemName: z.string().trim().max(200).optional(),
   confidence: z.coerce.number().min(0).max(1).default(0.5),
   ambiguity: z.string().trim().max(300).optional(),
-}).strict();
+});
 
 export const quoteAssistantModelSchema = z.object({
   lines: z.array(quoteAssistantLineSchema).max(30).default([]),
   questions: z.array(z.string().trim().min(3).max(300)).max(5).default([]),
   warnings: z.array(z.string().trim().min(3).max(300)).max(5).default([]),
   confidence: z.coerce.number().min(0).max(1).default(0.5),
-}).strict();
+});
 
 export const quoteAssistantInputSchema = z.object({
   locale: z.enum(["fr", "en"]).default("fr"),
@@ -36,4 +36,7 @@ export type QuoteAssistantLine = z.infer<typeof quoteAssistantLineSchema>;
 export type QuoteAssistantResult = z.infer<typeof quoteAssistantModelSchema> & {
   source: "local" | "ai";
   canApply: boolean;
+  checkIn?: string | null;
+  checkOut?: string | null;
+  people?: number | null;
 };

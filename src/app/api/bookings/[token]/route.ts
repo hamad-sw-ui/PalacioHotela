@@ -1,10 +1,10 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { bookings } from "@/db/schema";
-import { getSettings, notifyAdmin, notifyUser } from "@/lib/hotel";
-import { sendBookingCancellationEmails } from "@/lib/mail";
+import { afterBookingCancelled } from "@/lib/booking-refund";
+import { getSettings } from "@/lib/hotel";
 import { markBookingPaid } from "@/lib/payment-confirm";
-import { stripeClient } from "@/lib/payments";
+import { resolveStripeConfig, stripeClient, stripeSessionMatchesBooking } from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +13,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
   let [booking] = await db.select().from(bookings).where(eq(bookings.publicToken, token)).limit(1);
   if (!booking) return Response.json({ error: "Réservation introuvable." }, { status: 404 });
   const sessionId = new URL(request.url).searchParams.get("session_id");
-  if (sessionId && booking.paymentMethod === "card" && booking.paymentRef === sessionId && booking.paymentStatus !== "paid" && process.env.STRIPE_SECRET_KEY) {
+  const stripe = resolveStripeConfig(await getSettings());
+  if (sessionId && booking.paymentMethod === "card" && booking.paymentRef === sessionId && booking.paymentStatus !== "paid" && booking.paymentStatus !== "refunded" && stripe.secretKey) {
     try {
-      const session = await stripeClient().checkout.sessions.retrieve(sessionId);
-      if (session.payment_status === "paid" && session.amount_total === booking.total && session.currency === "xaf" && session.metadata?.bookingId === String(booking.id)) {
+      const session = await stripeClient(stripe.secretKey).checkout.sessions.retrieve(sessionId);
+      if (stripeSessionMatchesBooking(session, booking)) {
         await markBookingPaid(booking);
         [booking] = await db.select().from(bookings).where(eq(bookings.id, booking.id)).limit(1);
       }
@@ -33,9 +34,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
   if (!current) return Response.json({ error: "Réservation introuvable." }, { status: 404 });
   if (!["pending", "confirmed"].includes(current.status)) return Response.json({ error: "Cette réservation ne peut plus être annulée." }, { status: 409 });
   const [record] = await db.update(bookings).set({ status: "cancelled", updatedAt: new Date() }).where(eq(bookings.id, current.id)).returning();
-  const settings = await getSettings();
-  await sendBookingCancellationEmails(record, settings);
-  await notifyUser(record.userId, "booking", "Votre réservation a été annulée", record.reference || "", `/reservation/confirmation?token=${record.publicToken}`);
-  await notifyAdmin("booking", "Réservation annulée par le client", record.reference || record.guestName, `/admin?section=reservations`);
-  return Response.json({ ok: true, status: record.status });
+  const settled = await afterBookingCancelled(current, record, { actor: "guest", origin: new URL(request.url).origin });
+  return Response.json({ ok: true, status: settled.status, paymentStatus: settled.paymentStatus });
 }

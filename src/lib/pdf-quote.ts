@@ -3,6 +3,9 @@ import type { HotelSettings, QuoteRequest } from "@/db/schema";
 import { formatXaf, quoteLineTotal } from "@/lib/hotel";
 import { buildQuotePdfV2 } from "@/lib/pdf-quote-v2";
 import { buildQuotePdfV3 } from "@/lib/pdf-quote-v3";
+import { mergePalette, resolveQuotePalette, resolveQuoteTheme } from "@/lib/quote-pdf-theme";
+import { resolveQuoteLogo, resolveQuoteMonogram } from "@/lib/quote-header";
+import { quoteLogoUrl } from "@/lib/brand-logos";
 
 const clean = (value: unknown) => String(value ?? "").replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/[\u2013\u2014]/g, "-").replace(/\u0153/g, "oe").replace(/[^\x20-\xFF]/g, " ");
 
@@ -12,9 +15,9 @@ export async function buildLegacyQuotePdf(quote: QuoteRequest, settings: HotelSe
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const channel = (hex: string, shift: number) => parseInt(hex.slice(shift, shift + 2), 16) / 255;
   const fromHex = (hex: string) => rgb(channel(hex, 1), channel(hex, 3), channel(hex, 5));
-  const theme = settings.theme === "midnight" ? ["#1b303c", "#bf9a68"] : settings.theme === "terracotta" ? ["#6d3f31", "#c88860"] : ["#18382e", "#c09a63"];
-  const green = fromHex(theme[0]);
-  const gold = fromHex(theme[1]);
+  const palette = mergePalette(settings.theme, settings.themeColors);
+  const green = fromHex(palette.primary);
+  const gold = fromHex(palette.accent);
   const gray = rgb(0.38, 0.43, 0.40);
   const isEn = quote.locale === "en";
   let page = pdf.addPage([595, 842]);
@@ -55,7 +58,7 @@ export async function buildLegacyQuotePdf(quote: QuoteRequest, settings: HotelSe
   const category: Record<string, string> = { accommodation: isEn ? "Accommodation" : "Hébergement", conference_room: isEn ? "Conference room" : "Salle de conférence", event_hall: isEn ? "Event hall" : "Salle de fête", service: isEn ? "Services & leisure" : "Services & loisirs", restaurant: isEn ? "Dining" : "Restauration", mixed: isEn ? "Tailored experience" : "Expérience sur mesure" };
   text(category[quote.requestKind] || quote.requestKind, 14, true);
   if (quote.checkIn) text(`${isEn ? "From" : "Du"} ${quote.checkIn}${quote.checkOut ? ` ${isEn ? "to" : "au"} ${quote.checkOut}` : ""}`, 10, false, gray);
-  text(`${isEn ? "Guests" : "Personnes"} : ${quote.people}`, 10, false, gray);
+  text(quote.people == null ? (isEn ? "Guests to be confirmed" : "Nombre de personnes à confirmer") : `${isEn ? "Guests" : "Personnes"} : ${quote.people}`, 10, false, gray);
   if (quote.selectedItems.length) {
     y -= 15;
     for (const item of quote.selectedItems.slice(0, 20)) {
@@ -87,6 +90,8 @@ export async function buildLegacyQuotePdf(quote: QuoteRequest, settings: HotelSe
 }
 
 export async function buildQuotePdf(quote: QuoteRequest, settings: HotelSettings, kind: "receipt" | "quote") {
-  if (quote.pdfTemplateVersion >= 3) return buildQuotePdfV3(quote, settings, kind);
-  return quote.pdfTemplateVersion >= 2 && kind === "quote" ? buildQuotePdfV2(quote, settings, kind) : buildLegacyQuotePdf(quote, settings, kind);
+  const frozen = quote.themePaletteSnapshot;
+  const themed = { ...settings, logoUrl: resolveQuoteLogo(quote, { logoUrl: quoteLogoUrl(settings) }), tertiaryLogoUrl: resolveQuoteMonogram(quote, settings), theme: resolveQuoteTheme(quote, settings), themeColors: frozen ? resolveQuotePalette(quote, settings) : quote.themeSnapshot ? null : settings.themeColors };
+  if (quote.pdfTemplateVersion >= 3) return buildQuotePdfV3(quote, themed, kind);
+  return quote.pdfTemplateVersion >= 2 && kind === "quote" ? buildQuotePdfV2(quote, themed, kind) : buildLegacyQuotePdf(quote, themed, kind);
 }

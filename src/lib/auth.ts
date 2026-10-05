@@ -86,6 +86,7 @@ function previewAdmin() {
     phone: null,
     country: "",
     passwordHash: null,
+    googleSub: null,
     role: "admin",
     locale: "fr",
     active: true,

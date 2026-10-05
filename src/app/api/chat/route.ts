@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { getPublicCatalog, getSettings, formatXaf } from "@/lib/hotel";
+import { db } from "@/db";
+import { contactMessages } from "@/db/schema";
+import { chatCompletionsUrl, geminiChatOptions, GEMINI_DEFAULT_MODEL, resolveAiConfig, type AiEnv } from "@/lib/ai-provider";
+import { getPublicCatalog, getSettings, formatXaf, notifyAdmin } from "@/lib/hotel";
 
 const inputSchema = z.object({ locale: z.enum(["fr", "en"]).default("fr"), messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().min(1).max(1000) })).min(1).max(10) });
 
@@ -21,29 +24,41 @@ function localAnswer(message: string, locale: string, items: Awaited<ReturnType<
   return en ? "Welcome to Palacio Hotel! I can help you explore our rooms, event spaces, dining, experiences, rates and quote requests. What would you like to know?" : "Bienvenue au Palacio Hotel ! Je peux vous guider parmi nos chambres, espaces événementiels, restaurants, expériences, tarifs et demandes de devis. Que souhaitez-vous découvrir ?";
 }
 
+async function rememberConversation(question: string, reply: string) {
+  try {
+    const [row] = await db.insert(contactMessages).values({ name: "Visiteur du site", email: "visiteur@assistant.local", subject: "Assistant du site", message: `Visiteur : ${question}\n\nAssistant : ${reply}`.slice(0, 4000), status: "new" }).returning({ id: contactMessages.id });
+    await notifyAdmin("message", "Assistant du site", question.slice(0, 180), `/admin?section=messages&message=${row.id}`);
+  } catch (error) {
+    console.error("[Palacio] Assistant message:", error);
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const { messages, locale } = inputSchema.parse(await request.json());
     const settings = await getSettings();
     const catalog = await getPublicCatalog();
-    const provider = process.env.AI_PROVIDER || settings.aiProvider;
-    const key = process.env.AI_API_KEY || process.env.OPENAI_API_KEY;
-    const baseUrl = (process.env.AI_BASE_URL || settings.aiBaseUrl || "").replace(/\/$/, "");
-    const model = process.env.AI_MODEL || settings.aiModel;
+    const ai = resolveAiConfig(settings, process.env as unknown as AiEnv, "chat");
+    const provider = ai.provider;
+    const key = ai.key;
+    const baseUrl = ai.baseUrl;
+    const model = ai.model;
     const context = catalog.map((item) => `${item.nameFr} / ${item.nameEn} (${item.category}): ${formatXaf(item.price)} par ${item.pricingUnit}, capacité ${item.capacity}`).join("; ");
     const system = `You are Palacio Hotel's helpful bilingual concierge. Reply only in ${locale === "en" ? "English" : "French"}. Be warm, concise and accurate. Hotel: ${settings.addressFr}, ${settings.phone}, email ${settings.email}. Catalog: ${context}. Quotes are personalized, XAF TTC, final price set by hotel staff. Booking availability must be verified on the website. Never claim a booking or payment is confirmed. Encourage /devis or /reservation when appropriate. Never invent prices or availability.`;
-    if ((provider === "openai" || provider === "auto" && key) && key) {
+    if ((provider === "openai" || provider === "gemini" || provider === "auto" && key) && key) {
       try {
-        const response = await fetch(`${baseUrl || "https://api.openai.com"}/v1/chat/completions`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` }, body: JSON.stringify({ model: model || "gpt-4o-mini", temperature: 0.5, max_tokens: 280, messages: [{ role: "system", content: system }, ...messages] }), signal: AbortSignal.timeout(12000) });
-        if (response.ok) { const data = await response.json() as { choices?: { message?: { content?: string } }[] }; if (data.choices?.[0]?.message?.content) return Response.json({ reply: data.choices[0].message.content, source: "ai" }); }
+        const response = await fetch(chatCompletionsUrl(baseUrl, provider), { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` }, body: JSON.stringify({ model: model || (provider === "gemini" ? GEMINI_DEFAULT_MODEL : "gpt-4o-mini"), temperature: 0.5, max_tokens: provider === "gemini" ? 512 : 280, ...geminiChatOptions(provider, baseUrl), messages: [{ role: "system", content: system }, ...messages] }), signal: AbortSignal.timeout(20000) });
+        if (response.ok) { const data = await response.json() as { choices?: { message?: { content?: string } }[] }; const reply = data.choices?.[0]?.message?.content; if (reply) { await rememberConversation(messages.at(-1)?.content || "", reply); return Response.json({ reply, source: "ai" }); } }
       } catch (error) { console.error("[Palacio] AI provider unavailable:", error); }
     }
     if (provider === "ollama" || provider === "auto" && baseUrl && !key) {
       try {
         const response = await fetch(`${baseUrl || "http://127.0.0.1:11434"}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: model || "llama3.2", stream: false, messages: [{ role: "system", content: system }, ...messages] }), signal: AbortSignal.timeout(12000) });
-        if (response.ok) { const data = await response.json() as { message?: { content?: string } }; if (data.message?.content) return Response.json({ reply: data.message.content, source: "ai" }); }
+        if (response.ok) { const data = await response.json() as { message?: { content?: string } }; const reply = data.message?.content; if (reply) { await rememberConversation(messages.at(-1)?.content || "", reply); return Response.json({ reply, source: "ai" }); } }
       } catch (error) { console.error("[Palacio] Local AI unavailable:", error); }
     }
-    return Response.json({ reply: localAnswer(messages.at(-1)?.content || "", locale, catalog, settings), source: "local" });
+    const reply = localAnswer(messages.at(-1)?.content || "", locale, catalog, settings);
+    await rememberConversation(messages.at(-1)?.content || "", reply);
+    return Response.json({ reply, source: "local" });
   } catch { return Response.json({ error: "Message invalide." }, { status: 400 }); }
 }

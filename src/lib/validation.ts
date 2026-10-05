@@ -4,6 +4,8 @@ const name = z.string().trim().min(2).max(180);
 const email = z.email().max(255).transform((v) => v.trim().toLowerCase());
 const phone = z.string().trim().min(6).max(60);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const optionalDate = z.preprocess((value) => (value === "" || value === undefined ? null : value), date.nullable());
+const optionalPeople = z.preprocess((value) => (value === "" || value === undefined ? null : value), z.union([z.null(), z.coerce.number().int().min(1).max(1000)]));
 const mealType = z.enum(["breakfast", "lunch", "dinner", "snacks", "other"]);
 
 export const bookingInput = z.object({
@@ -42,9 +44,9 @@ export const quoteInput = z.object({
   locale: z.enum(["fr", "en"]).default("fr"),
   requestKind: z.enum(["accommodation", "conference_room", "event_hall", "service", "restaurant", "mixed"]),
   selectedItems: z.array(quoteItemInput).max(20).default([]),
-  checkIn: date.optional().nullable(),
-  checkOut: date.optional().nullable(),
-  people: z.coerce.number().int().min(1).max(1000),
+  checkIn: optionalDate,
+  checkOut: optionalDate,
+  people: optionalPeople,
   message: z.string().trim().max(4000).optional().default(""),
   budget: z.coerce.number().int().min(0).max(1000000000).optional().nullable(),
 });

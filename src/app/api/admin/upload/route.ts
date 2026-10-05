@@ -16,6 +16,7 @@ export async function POST(request: Request) {
   const types: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
   const extension = types[file.type];
   if (!extension) return Response.json({ error: "Formats acceptés : JPEG, PNG, WebP." }, { status: 400 });
+  if (String(form.get("purpose") || "") === "logo" && extension === "webp") return Response.json({ error: "Le logo doit être un PNG ou un JPEG." }, { status: 400 });
   const bytes = Buffer.from(await file.arrayBuffer());
   const valid = extension === "jpg" ? bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff : extension === "png" ? bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) : bytes.subarray(0, 4).toString() === "RIFF" && bytes.subarray(8, 12).toString() === "WEBP";
   if (!valid) return Response.json({ error: "Le fichier n'est pas une image valide." }, { status: 400 });

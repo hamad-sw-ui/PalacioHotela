@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { quoteRequests } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { demandRanges } from "@/lib/availability";
-import { findActiveUserIdByEmail, getPublicCatalog, getSettings, logActivity, notifyAdmin, notifyUser, remainingAvailability, validDateRange } from "@/lib/hotel";
+import { demandConflict, findActiveUserIdByEmail, getPublicCatalog, getSettings, logActivity, notifyAdmin, notifyUser, validDateRange, withCatalogLocks } from "@/lib/hotel";
 import { sendQuoteReceivedEmails } from "@/lib/mail";
 import { buildQuotePdf } from "@/lib/pdf-quote";
 import { quoteTotal } from "@/lib/quote-pricing";
@@ -25,20 +25,31 @@ export async function POST(request: Request) {
     } : body);
     if ((input.checkIn || input.checkOut) && (!input.checkIn || !input.checkOut || !validDateRange(input.checkIn, input.checkOut))) return Response.json({ error: "Dates invalides / Invalid dates" }, { status: 400 });
     const catalog = await getPublicCatalog();
+    const groups = new Map<number, { item: (typeof catalog)[number]; lines: typeof input.selectedItems }>();
     for (const selected of input.selectedItems) {
       const item = catalog.find((entry) => entry.id === selected.property_id);
       if (!item) return Response.json({ error: "Un élément sélectionné n'est plus disponible." }, { status: 400 });
       for (const range of demandRanges(selected, { start: input.checkIn, end: input.checkOut })) {
         if (!validDateRange(range.start, range.end)) return Response.json({ error: "Les dates d'un élément sont invalides." }, { status: 400 });
-        if (await remainingAvailability(item, range.start, range.end) < selected.quantity) return Response.json({ error: `${item.nameFr} n'est plus disponible à ces dates.` }, { status: 409 });
       }
+      const group = groups.get(item.id) || { item, lines: [] };
+      group.lines.push(selected);
+      groups.set(item.id, group);
     }
     const selectedItems = enrichQuoteItems(input.selectedItems, catalog, { checkIn: input.checkIn, checkOut: input.checkOut, source: "web" });
     // The hotel cannot host more people than the selected spaces allow: reject impossible requests early.
     const capacity = selectedItems.reduce((sum, item) => sum + (item.type === "accommodation" || item.type === "conference_room" || item.type === "event_hall" ? (catalog.find((entry) => entry.id === item.property_id)?.capacity || 0) * item.quantity : 0), 0);
-    if (capacity > 0 && input.people > capacity) return Response.json({ error: `Le nombre de personnes (${input.people}) dépasse la capacité totale des espaces sélectionnés (${capacity}). Réduisez le nombre de personnes ou ajoutez des espaces.` }, { status: 400 });
+    if (input.people != null && capacity > 0 && input.people > capacity) return Response.json({ error: `Le nombre de personnes (${input.people}) dépasse la capacité totale des espaces sélectionnés (${capacity}). Réduisez le nombre de personnes ou ajoutez des espaces.` }, { status: 400 });
     const linkedUserId = user?.id || await findActiveUserIdByEmail(input.guestEmail);
-    const [created] = await db.insert(quoteRequests).values({ publicToken: randomBytes(28).toString("hex"), userId: linkedUserId, guestName: input.guestName, guestEmail: input.guestEmail, guestPhone: input.guestPhone, company: input.company, locale: input.locale, requestKind: input.requestKind, selectedItems, checkIn: input.checkIn || null, checkOut: input.checkOut || null, people: input.people, message: input.message, budget: input.budget ?? null, estimatedTotal: quoteTotal(selectedItems), pdfTemplateVersion: currentQuotePdfVersion(), status: "new" }).returning();
+    const created = await withCatalogLocks([...groups.keys()], async () => {
+      for (const group of groups.values()) {
+        const blocked = await demandConflict(group.item, group.lines, { start: input.checkIn, end: input.checkOut });
+        if (blocked) return blocked;
+      }
+      const [row] = await db.insert(quoteRequests).values({ publicToken: randomBytes(28).toString("hex"), userId: linkedUserId, guestName: input.guestName, guestEmail: input.guestEmail, guestPhone: input.guestPhone, company: input.company, locale: input.locale, requestKind: input.requestKind, selectedItems, checkIn: input.checkIn || null, checkOut: input.checkOut || null, people: input.people, message: input.message, budget: input.budget ?? null, estimatedTotal: quoteTotal(selectedItems), pdfTemplateVersion: currentQuotePdfVersion(), status: "new" }).returning();
+      return row;
+    });
+    if ("nameFr" in created) return Response.json({ error: `${created.nameFr} n'est plus disponible à ces dates.` }, { status: 409 });
     const reference = `DEV-${new Date().getFullYear()}-${String(created.id).padStart(5, "0")}`;
     const [quote] = await db.update(quoteRequests).set({ reference }).where(eq(quoteRequests.id, created.id)).returning();
     const settings = await getSettings();

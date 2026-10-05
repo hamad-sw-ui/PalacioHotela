@@ -12,5 +12,5 @@ export default async function AdminPage() {
   const settings = await getSettings();
   const demo = !process.env.ADMIN_PASSWORD;
   const demoEmail = demo ? (process.env.ADMIN_EMAIL || "admin@palaciohotel.com").toLowerCase() : "";
-  return <AdminGate initialAuthenticated={Boolean(admin)} demo={demo} demoEmail={demoEmail} supportEmail={settings.email} hotelAddress={settings.addressFr}/>;
+  return <AdminGate initialAuthenticated={Boolean(admin)} demo={demo} demoEmail={demoEmail} supportEmail={settings.email} hotelAddress={settings.addressFr} secondaryLogoUrl={settings.secondaryLogoUrl}/>;
 }

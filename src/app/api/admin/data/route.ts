@@ -4,6 +4,8 @@ import { activityLogs, bookings, catalogItems, contactMessages, contentPages, no
 import { getAdmin } from "@/lib/auth";
 import { getSettings } from "@/lib/hotel";
 import { paymentConfiguration } from "@/lib/payments";
+import { settingsForBrowser } from "@/lib/smtp";
+import { googleAuthConfigured, googleEnvFromSettings } from "@/lib/google-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -21,5 +23,6 @@ export async function GET() {
     db.select().from(notifications).where(isNull(notifications.userId)).orderBy(desc(notifications.createdAt)).limit(100),
     db.select().from(activityLogs).orderBy(desc(activityLogs.createdAt)).limit(300),
   ]);
-  return Response.json({ admin: { id: admin.id, fullName: admin.fullName, role: admin.role, email: admin.email }, bookings: allBookings, quotes: allQuotes, catalog: allCatalog, pages: allPages, users: allUsers, messages: allMessages, notifications: allNotifications, activity: allActivity, settings, integrations: { ...paymentConfiguration(), smtp: Boolean(process.env.SMTP_HOST), aiApi: Boolean(process.env.AI_API_KEY || process.env.OPENAI_API_KEY), demoLogin: !process.env.ADMIN_PASSWORD }, stats: { bookings: allBookings.length, pendingBookings: allBookings.filter((b) => b.status === "pending").length, quotes: allQuotes.length, newQuotes: allQuotes.filter((q) => q.status === "new").length, unread: allNotifications.filter((n) => !n.read).length, messages: allMessages.filter((m) => m.status === "new").length } });
+  const visibleSettings = settingsForBrowser(settings);
+  return Response.json({ admin: { id: admin.id, fullName: admin.fullName, role: admin.role, email: admin.email }, bookings: allBookings, quotes: allQuotes, catalog: allCatalog, pages: allPages, users: allUsers, messages: allMessages, notifications: allNotifications, activity: allActivity, settings: visibleSettings, integrations: { ...paymentConfiguration(settings), google: googleAuthConfigured(googleEnvFromSettings(settings)), googleClientIdSet: Boolean(settings.googleClientId), googleClientSecretSet: Boolean(settings.googleClientSecret), smtp: Boolean(settings.smtpHost || process.env.SMTP_HOST), smtpPasswordSet: Boolean(settings.smtpPassword), aiApi: Boolean(settings.aiApiKey || process.env.AI_API_KEY || process.env.OPENAI_API_KEY), aiApiKeySet: Boolean(settings.aiApiKey), stripeSecretKeySet: Boolean(settings.stripeSecretKey), stripeWebhookSecretSet: Boolean(settings.stripeWebhookSecret), paypalClientIdSet: Boolean(settings.paypalClientId), paypalClientSecretSet: Boolean(settings.paypalClientSecret), demoLogin: !process.env.ADMIN_PASSWORD }, stats: { bookings: allBookings.length, pendingBookings: allBookings.filter((b) => b.status === "pending").length, quotes: allQuotes.length, newQuotes: allQuotes.filter((q) => q.status === "new").length, unread: allNotifications.filter((n) => !n.read).length, messages: allMessages.filter((m) => m.status === "new").length } });
 }

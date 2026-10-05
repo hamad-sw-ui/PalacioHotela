@@ -6,12 +6,13 @@ import { formatXaf } from "@/lib/format";
 import { quoteLineTotal, quoteTotal } from "@/lib/quote-pricing";
 import { formatQuoteLineMeta, formatQuoteLineMeals } from "@/lib/quote-line-display";
 import { containInBox } from "@/lib/pdf-image-fit";
+import { resolveQuoteHeaderImage } from "@/lib/quote-header";
 import { buildQuoteDocumentModel } from "@/lib/quote-document-model";
-import { getQuotePdfPalette } from "@/lib/quote-pdf-theme";
+import { mergePalette } from "@/lib/quote-pdf-theme";
 
 const clean = (value: unknown) => String(value ?? "").replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/[\u2013\u2014]/g, "-").replace(/\u0153/g, "oe").replace(/[^\x20-\xFF]/g, " ");
 
-type Palette = { primary: ReturnType<typeof rgb>; dark: ReturnType<typeof rgb>; accent: ReturnType<typeof rgb>; accentLight: ReturnType<typeof rgb>; ink: ReturnType<typeof rgb>; muted: ReturnType<typeof rgb>; paper: ReturnType<typeof rgb>; soft: ReturnType<typeof rgb>; border: ReturnType<typeof rgb> };
+type Palette = { primary: ReturnType<typeof rgb>; dark: ReturnType<typeof rgb>; accent: ReturnType<typeof rgb>; accentLight: ReturnType<typeof rgb>; ink: ReturnType<typeof rgb>; muted: ReturnType<typeof rgb>; paper: ReturnType<typeof rgb>; soft: ReturnType<typeof rgb>; border: ReturnType<typeof rgb>; white: ReturnType<typeof rgb> };
 
 function hex(value: string) {
   const normalized = value.replace("#", "");
@@ -19,8 +20,8 @@ function hex(value: string) {
   return rgb(((number >> 16) & 255) / 255, ((number >> 8) & 255) / 255, (number & 255) / 255);
 }
 
-function palette(theme: string): Palette {
-  const values = getQuotePdfPalette(theme);
+function palette(settings: { theme?: string | null; themeColors?: unknown }): Palette {
+  const values = mergePalette(settings.theme, settings.themeColors);
   return Object.fromEntries(Object.entries(values).map(([key, value]) => [key, hex(value)])) as Palette;
 }
 
@@ -55,29 +56,36 @@ export async function buildQuotePdfV2(
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const colors = palette(settings.theme);
+  const colors = palette(settings);
   const width = 595;
   const height = 842;
   const left = 42;
   const right = 553;
   const contentWidth = right - left;
-  const logo = await embedAsset(pdf, settings.logoUrl);
-  const adminSignature = await embedAsset(pdf, quote.adminSignatureUrl || settings.quoteSignatureUrl);
-  const adminStamp = await embedAsset(pdf, quote.adminStampUrl || settings.quoteStampUrl);
+  const headerImage = await embedAsset(pdf, resolveQuoteHeaderImage(quote, settings));
+  const plate = headerImage ? null : (await embedAsset(pdf, settings.tertiaryLogoUrl) || await embedAsset(pdf, settings.logoUrl));
+  const adminSignature = await embedAsset(pdf, quote.adminSignatureUrl);
+  const adminStamp = await embedAsset(pdf, quote.adminStampUrl);
   const clientSignature = await embedAsset(pdf, quote.clientSignatureUrl);
   let page = pdf.addPage([width, height]);
   let y = 0;
 
   const drawHeader = (target: PDFPage) => {
     target.drawRectangle({ x: 0, y: height - 112, width, height: 112, color: colors.primary });
-    if (logo) {
-      const scale = Math.min(115 / logo.width, 56 / logo.height);
-      target.drawImage(logo, { x: left, y: height - 78, width: logo.width * scale, height: logo.height * scale });
+    if (headerImage) {
+      const box = { x: 0, y: height - 112, width, height: 112 };
+      target.drawImage(headerImage, containInBox(headerImage, box));
+      return;
+    }
+    if (plate) {
+      const box = { x: left, y: height - 88, width: 150, height: 64 };
+      target.drawRectangle({ x: box.x, y: box.y, width: box.width, height: box.height, color: rgb(1, 1, 1) });
+      target.drawImage(plate, containInBox(plate, box));
     } else {
-      target.drawText("PALACIO", { x: left, y: height - 54, size: 25, font: bold, color: rgb(1, 1, 1) });
+      target.drawText("PALACIO", { x: left, y: height - 54, size: 25, font: bold, color: colors.white });
       target.drawText("H O T E L", { x: left + 2, y: height - 73, size: 8, font: regular, color: colors.accentLight });
     }
-    target.drawText(clean(designVersion >= 3 ? model.hotel.address : settings.addressFr), { x: 330, y: height - 42, size: 8.5, font: regular, color: rgb(1, 1, 1), maxWidth: 220 });
+    target.drawText(clean(designVersion >= 3 ? model.hotel.address : settings.addressFr), { x: 330, y: height - 42, size: 8.5, font: regular, color: colors.white, maxWidth: 220 });
     target.drawText(clean(`${settings.phone}  ·  ${settings.email}`), { x: 330, y: height - 59, size: 8.5, font: regular, color: colors.accentLight, maxWidth: 220 });
   };
   drawHeader(page);
@@ -128,17 +136,18 @@ export async function buildQuotePdfV2(
   page.drawText(isEn ? "PROJECT OVERVIEW" : "VOTRE PROJET", { x: 319, y: infoTop - 17, size: 7.5, font: bold, color: colors.accent });
   page.drawText(clean(quote.requestKind.replaceAll("_", " ")), { x: 319, y: infoTop - 34, size: 11, font: bold, color: colors.ink, maxWidth: 218 });
   const period = quote.checkIn ? `${quote.checkIn}${quote.checkOut ? ` → ${quote.checkOut}` : ""}` : (isEn ? "Dates to be confirmed" : "Dates à confirmer");
-  page.drawText(clean(`${period} · ${quote.people} ${isEn ? "guests" : "personnes"}`), { x: 319, y: infoTop - 51, size: 8, font: regular, color: colors.muted, maxWidth: 218 });
+  const guests = quote.people == null ? (isEn ? "Guests to be confirmed" : "Nombre de personnes à confirmer") : `${quote.people} ${isEn ? "guests" : "personnes"}`;
+  page.drawText(clean(`${period} · ${guests}`), { x: 319, y: infoTop - 51, size: 8, font: regular, color: colors.muted, maxWidth: 218 });
   y = infoTop - 91;
 
   label(isEn ? "SELECTED SERVICES" : "PRESTATIONS SÉLECTIONNÉES");
   const columns = { item: left, details: 245, qty: 410, unit: 450, total: 500 };
   page.drawRectangle({ x: left, y: y - 20, width: contentWidth, height: 22, color: colors.primary });
-  page.drawText(isEn ? "ITEM" : "PRESTATION", { x: columns.item + 8, y: y - 14, size: 7.5, font: bold, color: rgb(1, 1, 1) });
-  page.drawText(isEn ? "DETAILS" : "DÉTAILS", { x: columns.details, y: y - 14, size: 7.5, font: bold, color: rgb(1, 1, 1) });
-  page.drawText(isEn ? "QTY" : "QTÉ", { x: columns.qty, y: y - 14, size: 7.5, font: bold, color: rgb(1, 1, 1) });
-  page.drawText(isEn ? "UNIT" : "UNITÉ", { x: columns.unit, y: y - 14, size: 7.5, font: bold, color: rgb(1, 1, 1) });
-  page.drawText(isEn ? "TOTAL" : "TOTAL", { x: columns.total, y: y - 14, size: 7.5, font: bold, color: rgb(1, 1, 1) });
+  page.drawText(isEn ? "ITEM" : "PRESTATION", { x: columns.item + 8, y: y - 14, size: 7.5, font: bold, color: colors.white });
+  page.drawText(isEn ? "DETAILS" : "DÉTAILS", { x: columns.details, y: y - 14, size: 7.5, font: bold, color: colors.white });
+  page.drawText(isEn ? "QTY" : "QTÉ", { x: columns.qty, y: y - 14, size: 7.5, font: bold, color: colors.white });
+  page.drawText(isEn ? "UNIT" : "UNITÉ", { x: columns.unit, y: y - 14, size: 7.5, font: bold, color: colors.white });
+  page.drawText(isEn ? "TOTAL" : "TOTAL", { x: columns.total, y: y - 14, size: 7.5, font: bold, color: colors.white });
   y -= 28;
 
   const items = quote.selectedItems || [];
@@ -210,13 +219,16 @@ export async function buildQuotePdfV2(
   if (adminSignature) {
     const scale = Math.min(120 / adminSignature.width, 38 / adminSignature.height);
     page.drawImage(adminSignature, { x: 317, y: y - 37, width: adminSignature.width * scale, height: adminSignature.height * scale });
+  } else {
+    page.drawRectangle({ x: 310, y: y - 42, width: 200, height: 43, borderColor: colors.border, borderWidth: .7 });
+    page.drawText(isEn ? "Awaiting hotel signature" : "Signature de l'hôtel en attente", { x: 318, y: y - 25, size: 7, font: regular, color: colors.muted });
   }
   page.drawLine({ start: { x: left + 8, y: y - 48 }, end: { x: left + 208, y: y - 48 }, thickness: .7, color: colors.border });
   page.drawLine({ start: { x: 310, y: y - 48 }, end: { x: right, y: y - 48 }, thickness: .7, color: colors.border });
   page.drawText(clean(quote.clientSignerName || (isEn ? "Client" : "Client")), { x: left + 8, y: y - 61, size: 7.5, font: regular, color: colors.ink });
-  page.drawText(clean(quote.adminSignerName || settings.quoteSignerName || settings.hotelName), { x: 310, y: y - 61, size: 7.5, font: regular, color: colors.ink, maxWidth: 155 });
+  page.drawText(clean(quote.adminSignerName || ""), { x: 310, y: y - 61, size: 7.5, font: regular, color: colors.ink, maxWidth: 155 });
   page.drawText(quote.clientSignedAt ? `${isEn ? "Signed" : "Signé"} : ${new Date(quote.clientSignedAt).toLocaleDateString(isEn ? "en-GB" : "fr-FR")}` : (isEn ? "To be signed by client" : "À signer par le client"), { x: left + 8, y: y - 73, size: 7, font: regular, color: colors.muted });
-  const adminRole = designVersion >= 3 ? quote.adminSignerRole || settings.quoteSignerRole : "";
+  const adminRole = designVersion >= 3 ? quote.adminSignerRole || "" : "";
   const adminSigned = quote.adminSignedAt ? `${isEn ? "Signed" : "Signé"} : ${new Date(quote.adminSignedAt).toLocaleDateString(isEn ? "en-GB" : "fr-FR")}` : "";
   page.drawText(clean([adminRole, adminSigned].filter(Boolean).join(" · ")), { x: 310, y: y - 73, size: 7, font: regular, color: colors.muted, maxWidth: 155 });
   if (adminStamp) page.drawImage(adminStamp, containInBox(adminStamp, { x: 418, y: y - 86, width: 112, height: 112 }));
