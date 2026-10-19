@@ -4,6 +4,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFPage } from "pdf-lib";
 import type { HotelSettings, QuoteRequest, SelectedItem } from "@/db/schema";
 import { formatXaf } from "@/lib/format";
 import { quoteLineTotal, quoteTotal } from "@/lib/quote-pricing";
+import { requestKindLabel } from "@/lib/request-kind";
 import { formatQuoteLineMeta, formatQuoteLineMeals } from "@/lib/quote-line-display";
 import { containInBox } from "@/lib/pdf-image-fit";
 import { resolveQuoteHeaderImage } from "@/lib/quote-header";
@@ -133,8 +134,8 @@ export async function buildQuotePdfV2(
   page.drawText(clean(quote.guestName), { x: left + 12, y: infoTop - 34, size: 11, font: bold, color: colors.ink, maxWidth: 210 });
   page.drawText(clean(quote.company || quote.guestEmail), { x: left + 12, y: infoTop - 49, size: 8, font: regular, color: colors.muted, maxWidth: 210 });
   page.drawText(clean(designVersion >= 3 && quote.company ? `${quote.guestEmail} · ${quote.guestPhone}` : quote.company ? quote.guestEmail : quote.guestPhone), { x: left + 12, y: infoTop - 61, size: 8, font: regular, color: colors.muted, maxWidth: 210 });
-  page.drawText(isEn ? "PROJECT OVERVIEW" : "VOTRE PROJET", { x: 319, y: infoTop - 17, size: 7.5, font: bold, color: colors.accent });
-  page.drawText(clean(quote.requestKind.replaceAll("_", " ")), { x: 319, y: infoTop - 34, size: 11, font: bold, color: colors.ink, maxWidth: 218 });
+  page.drawText(isEn ? "SUBJECT" : "VOTRE OBJET", { x: 319, y: infoTop - 17, size: 7.5, font: bold, color: colors.accent });
+  page.drawText(clean(requestKindLabel(quote.requestKind, quote.locale)), { x: 319, y: infoTop - 34, size: 11, font: bold, color: colors.ink, maxWidth: 218 });
   const period = quote.checkIn ? `${quote.checkIn}${quote.checkOut ? ` → ${quote.checkOut}` : ""}` : (isEn ? "Dates to be confirmed" : "Dates à confirmer");
   const guests = quote.people == null ? (isEn ? "Guests to be confirmed" : "Nombre de personnes à confirmer") : `${quote.people} ${isEn ? "guests" : "personnes"}`;
   page.drawText(clean(`${period} · ${guests}`), { x: 319, y: infoTop - 51, size: 8, font: regular, color: colors.muted, maxWidth: 218 });
@@ -146,8 +147,9 @@ export async function buildQuotePdfV2(
   page.drawText(isEn ? "ITEM" : "PRESTATION", { x: columns.item + 8, y: y - 14, size: 7.5, font: bold, color: colors.white });
   page.drawText(isEn ? "DETAILS" : "DÉTAILS", { x: columns.details, y: y - 14, size: 7.5, font: bold, color: colors.white });
   page.drawText(isEn ? "QTY" : "QTÉ", { x: columns.qty, y: y - 14, size: 7.5, font: bold, color: colors.white });
-  page.drawText(isEn ? "UNIT" : "UNITÉ", { x: columns.unit, y: y - 14, size: 7.5, font: bold, color: colors.white });
-  page.drawText(isEn ? "TOTAL" : "TOTAL", { x: columns.total, y: y - 14, size: 7.5, font: bold, color: colors.white });
+  page.drawText(isEn ? "DAY" : "JOUR", { x: columns.unit, y: y - 14, size: 7.5, font: bold, color: colors.white });
+  page.drawText(isEn ? "UNIT PRICE" : "PRIX UNITAIRE", { x: columns.qty - 68, y: y - 14, size: 7.5, font: bold, color: colors.white });
+  page.drawText(isEn ? "TOTAL AMOUNT" : "MONTANT TOTAL", { x: columns.total - 44, y: y - 14, size: 7.5, font: bold, color: colors.white });
   y -= 28;
 
   const items = quote.selectedItems || [];
@@ -164,7 +166,7 @@ export async function buildQuotePdfV2(
     page.drawText(clean(isEn ? item.name_en : item.name_fr), { x: columns.item + 8, y: y - 12, size: 8.5, font: bold, color: colors.ink, maxWidth: 185 });
     detailLines.slice(0, 3).forEach((detail, detailIndex) => page.drawText(clean(detail), { x: columns.details, y: y - 12 - detailIndex * 10, size: 7, font: regular, color: colors.muted, maxWidth: 155 }));
     page.drawText(String(item.quantity), { x: columns.qty + 5, y: y - 12, size: 8, font: regular, color: colors.ink });
-    page.drawText(item.type === "accommodation" ? (isEn ? "night" : "nuit") : item.type === "restaurant" ? (isEn ? "service" : "service") : (isEn ? "unit" : "unité"), { x: columns.unit, y: y - 12, size: 7, font: regular, color: colors.muted });
+    page.drawText(item.type === "accommodation" ? (isEn ? "night" : "nuit") : item.type === "restaurant" ? (isEn ? "service" : "service") : (isEn ? "day" : "jour"), { x: columns.unit, y: y - 12, size: 7, font: regular, color: colors.muted });
     page.drawText(clean(formatXaf(quoteLineTotal(item), quote.locale)), { x: columns.total, y: y - 12, size: 7.5, font: bold, color: colors.ink });
     page.drawLine({ start: { x: left, y: y - rowHeight + 4 }, end: { x: right, y: y - rowHeight + 4 }, thickness: .5, color: colors.border });
     y -= rowHeight;

@@ -11,7 +11,6 @@ import {
   Download,
   Heart,
   Loader2,
-  MessageCircle,
   Minus,
   Plus,
   ShieldCheck,
@@ -45,6 +44,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { PageBack } from "@/components/page-back";
 import { tr, useSite, whatsappUrl } from "@/components/site-shell";
 import { signInHref } from "@/lib/member-gate";
+import { WhatsAppMark } from "@/components/whatsapp-mark";
+import { siteImage } from "@/lib/site-image";
 
 type CartLine = {
   lineId: string;
@@ -152,6 +153,7 @@ export function QuoteClient({
   const router = useRouter();
   const pathname = usePathname();
   const search = useSearchParams();
+  const projectDescriptionRef = useRef<HTMLTextAreaElement>(null);
   const initialItem = items.find((item) => item.id === Number(initial.itemId));
   const [category, setCategory] = useState(
     initialItem?.category ||
@@ -187,7 +189,7 @@ export function QuoteClient({
   const [remaining, setRemaining] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [method, setMethod] = useState<"manual" | "assistant">("manual");
+  const [method, setMethod] = useState<"manual" | "assistant">("assistant");
   const [assistantBusy, setAssistantBusy] = useState(false);
   const [assistantResult, setAssistantResult] =
     useState<QuoteAssistantResult | null>(null);
@@ -197,6 +199,13 @@ export function QuoteClient({
     token: string;
     pdfUrl: string;
   } | null>(null);
+  function chooseMethod(next: "manual" | "assistant") {
+    setMethod(next);
+    setError("");
+    if (next === "assistant") {
+      requestAnimationFrame(() => projectDescriptionRef.current?.focus());
+    }
+  }
   const today = new Date().toISOString().slice(0, 10);
   const shown = items.filter((item) => item.category === category);
   const reservationDays = useMemo(
@@ -567,7 +576,7 @@ export function QuoteClient({
       setError(
         tr(
           locale,
-          "Décrivez votre projet en quelques mots avant de lancer l’analyse.",
+          "Décrivez votre besoin en quelques mots avant de lancer l’analyse.",
           "Describe your plans before starting the analysis.",
         ),
       );
@@ -788,7 +797,7 @@ export function QuoteClient({
               <p>
                 {tr(
                   locale,
-                  "Notre équipe étudie votre projet avec attention. Un devis personnalisé en XAF TTC vous sera envoyé prochainement par e-mail.",
+                  "Notre équipe étudie votre demande avec attention. Un devis personnalisé en XAF TTC vous sera envoyé prochainement par e-mail.",
                   "Our team is carefully reviewing your plans. A personalized quote in XAF, tax included, will be sent by email shortly.",
                 )}
               </p>
@@ -836,37 +845,46 @@ export function QuoteClient({
               )}
             </div>
             <h2>
-              {tr(locale, "À chaque projet, ", "For every vision, ")}
+              {tr(locale, "À chaque demande, ", "For every vision, ")}
               <em>{tr(locale, "sa proposition.", "a unique proposal.")}</em>
             </h2>
             <p>
               {tr(
                 locale,
-                "Composez votre sélection vous-même, ou décrivez votre projet pour qu’il soit préparé automatiquement. C’est sans engagement.",
+                "Composez votre sélection vous-même, ou décrivez votre besoin pour qu’il soit préparé automatiquement. C’est sans engagement.",
                 "Build your selection yourself, or describe your project and have it prepared automatically. There's no obligation.",
               )}
             </p>
           </div>
-          <div className="quote-method-switch" role="tablist">
+          <div
+            className="quote-method-switch"
+            role="group"
+            aria-label={tr(locale, "Choisissez votre parcours", "Choose your path")}
+          >
             <button
               type="button"
-              className={method === "manual" ? "active" : ""}
-              onClick={() => setMethod("manual")}
+              className={`quote-method-option quote-method-assistant ${method === "assistant" ? "active" : ""}`}
+              aria-pressed={method === "assistant"}
+              onClick={() => chooseMethod("assistant")}
             >
-              <Check size={16} />
-              {tr(locale, "Sans IA · je compose", "Without AI · I'll compose")}
+              <Sparkles size={16} />
+              <span>
+                <strong>{tr(locale, "Décrire mon besoin avec l’IA", "Describe my project with AI")}</strong>
+                <small>{tr(locale, "Recevez une sélection à vérifier et modifier avant l’envoi.", "Get a suggested selection to review and edit before sending.")}</small>
+              </span>
+              <span className="quote-method-badge">{tr(locale, "RECOMMANDÉ", "SUGGESTED")}</span>
             </button>
             <button
               type="button"
-              className={method === "assistant" ? "active" : ""}
-              onClick={() => setMethod("assistant")}
+              className={`quote-method-option quote-method-manual ${method === "manual" ? "active" : ""}`}
+              aria-pressed={method === "manual"}
+              onClick={() => chooseMethod("manual")}
             >
-              <Sparkles size={16} />
-              {tr(
-                locale,
-                "Avec IA · décrire mon projet",
-                "With AI · describe my project",
-              )}
+              <Check size={19} />
+              <span>
+                <strong>{tr(locale, "Composer manuellement", "Build it manually")}</strong>
+                <small>{tr(locale, "Choisissez vous-même les prestations à inclure.", "Choose the services to include yourself.")}</small>
+              </span>
             </button>
           </div>
           <div className="form-layout quote-form-layout">
@@ -874,7 +892,7 @@ export function QuoteClient({
               <div className="form-card">
                 <div className="form-step">
                   <b>01</b>
-                  <span>{tr(locale, "VOTRE PROJET", "YOUR PLANS")}</span>
+                  <span>{tr(locale, "VOTRE OBJET", "YOUR PLANS")}</span>
                 </div>
                 <h2>
                   {method === "assistant"
@@ -893,7 +911,7 @@ export function QuoteClient({
                   {method === "assistant"
                     ? tr(
                         locale,
-                        "Écrivez votre projet à l’étape suivante, lancez la compréhension, puis ajoutez la proposition à votre sélection. Vous pourrez encore la modifier.",
+                        "Précisez l’objet de votre demande à l’étape suivante, lancez l’analyse, puis ajoutez la proposition à votre sélection. Vous pourrez encore la modifier.",
                         "Write your project in the next step, run the understanding, then add the proposal to your selection. You can still edit it.",
                       )
                     : tr(
@@ -932,7 +950,7 @@ export function QuoteClient({
                               onError={(event) => {
                                 event.currentTarget.onerror = null;
                                 event.currentTarget.src =
-                                  "/images/palacio-hero.jpg";
+                                  siteImage(settings.fallbackImage, "/images/palacio-hero.jpg");
                               }}
                               src={item.image}
                               alt={item.nameFr}
@@ -1191,11 +1209,12 @@ export function QuoteClient({
                     <span>
                       {tr(
                         locale,
-                        "RACONTEZ-NOUS VOTRE PROJET (OPTIONNEL)",
+                        "PRÉCISEZ L’OBJET DE VOTRE DEMANDE (OPTIONNEL)",
                         "TELL US ABOUT YOUR PLANS (OPTIONAL)",
                       )}
                     </span>
                     <textarea
+                      ref={projectDescriptionRef}
                       maxLength={4000}
                       value={message}
                       onChange={(e) => {
@@ -1508,7 +1527,7 @@ export function QuoteClient({
               <div className="summary-card">
                 <span className="eyebrow eyebrow-light">
                   <span className="eyebrow-line" />
-                  {tr(locale, "VOTRE PROJET", "YOUR PLANS")}
+                  {tr(locale, "VOTRE OBJET", "YOUR PLANS")}
                 </span>
                 <h3 className="quote-summary-title">
                   {tr(locale, "Votre sélection", "Your selection")}
@@ -1585,7 +1604,7 @@ export function QuoteClient({
                     <p>
                       {tr(
                         locale,
-                        "Sélectionnez des prestations à gauche, ou décrivez simplement votre projet.",
+                        "Sélectionnez des prestations à gauche, ou décrivez simplement votre besoin.",
                         "Add items on the left, or simply describe what you have in mind.",
                       )}
                     </p>
@@ -1624,7 +1643,7 @@ export function QuoteClient({
                 <p>
                   {tr(
                     locale,
-                    "Notre équipe est aussi disponible sur WhatsApp pour imaginer votre projet avec vous.",
+                    "Notre équipe est aussi disponible sur WhatsApp pour étudier votre objet avec vous.",
                     "Our team is also available on WhatsApp to help plan your project.",
                   )}
                 </p>
@@ -1640,7 +1659,7 @@ export function QuoteClient({
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <MessageCircle size={17} />
+                  <WhatsAppMark size={21} />
                   {tr(locale, "Échanger sur WhatsApp", "Chat on WhatsApp")}
                   <ArrowUpRight size={16} />
                 </a>

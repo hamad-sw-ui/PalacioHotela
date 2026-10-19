@@ -5,6 +5,7 @@ import { bookings } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { bookingTotal, demandConflict, getPublicCatalog, getSettings, logActivity, notifyAdmin, notifyUser, validDateRange, withCatalogLocks } from "@/lib/hotel";
 import { sendBookingEmails } from "@/lib/mail";
+import { safeBookingPdf } from "@/lib/payment-confirm";
 import { createPayPalOrder, createStripeCheckout, paymentConfiguration } from "@/lib/payments";
 import { bookingInput, parseError } from "@/lib/validation";
 import { bookingAdminHref } from "@/lib/notification-links";
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
     await notifyAdmin("booking", `Nouvelle réservation ${reference}`, `${input.guestName} · ${item.nameFr} · ${input.checkIn}`, bookingAdminHref(booking.id));
     await notifyUser(booking.userId, "booking", "Votre demande de réservation a bien été reçue", `${reference} · ${item.nameFr}`, `/reservation/confirmation?token=${booking.publicToken}`);
     await logActivity("Création de réservation", "booking", booking.id, input.guestName, user?.id || null, reference);
-    await sendBookingEmails(booking, settings, new URL(request.url).origin);
+    await sendBookingEmails(booking, settings, new URL(request.url).origin, await safeBookingPdf(booking, settings, "receipt"));
     return Response.json({ ok: true, reference, token, redirectUrl, paymentError, total, status: booking.status }, { status: 201 });
   } catch (error) {
     console.error("[Palacio] Booking error:", error);

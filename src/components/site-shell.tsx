@@ -11,6 +11,7 @@ import { authFetch, setSessionToken } from "@/lib/client-session";
 import { memberHref } from "@/lib/member-gate";
 import { rememberSitePath } from "@/lib/site-navigation";
 import { whatsappUrl } from "@/lib/whatsapp";
+import { WhatsAppMark } from "@/components/whatsapp-mark";
 import { mergePalette, paletteIsCustom } from "@/lib/quote-pdf-theme";
 import { themeVariableStyle } from "@/lib/platform-colors";
 
@@ -147,5 +148,5 @@ export function SiteShell({ settings, children }: { settings: HotelSettings; chi
       window.removeEventListener("popstate", save);
     };
   }, [pathname, search]);
-  return <SiteContext.Provider value={{ locale, setLocale, settings, member, setMember }}><div className="site-shell" data-theme={customPreview ? "custom" : theme} style={customPreview ? themeVariableStyle(settings.theme, customPreview) : previewing ? themeVariableStyle(theme) : undefined}>{previewing && <p className="theme-preview-banner">{locale === "en" ? "Unsaved theme preview" : "Aperçu du thème non enregistré"}</p>}<Header/>{children}<Footer/><a className="whatsapp-float" href={whatsappUrl(settings.whatsapp, tr(locale, "Bonjour Palacio Hotel ! J'aimerais avoir plus d'informations.", "Hello Palacio Hotel! I would like more information."))} target="_blank" rel="noopener noreferrer" aria-label="Contacter sur WhatsApp"><span className="whatsapp-icon">☎</span><span>{tr(locale, "Écrivez-nous", "Chat with us")}</span></a><ChatWidget/></div></SiteContext.Provider>;
+  return <SiteContext.Provider value={{ locale, setLocale, settings, member, setMember }}><div className="site-shell" data-theme={customPreview ? "custom" : theme} style={customPreview ? themeVariableStyle(settings.theme, customPreview) : previewing ? themeVariableStyle(theme) : undefined}>{previewing && <p className="theme-preview-banner">{locale === "en" ? "Unsaved theme preview" : "Aperçu du thème non enregistré"}</p>}<Header/>{children}<Footer/><a className="whatsapp-float" href={whatsappUrl(settings.whatsapp, tr(locale, "Bonjour Palacio Hotel ! J'aimerais avoir plus d'informations.", "Hello Palacio Hotel! I would like more information."))} target="_blank" rel="noopener noreferrer" aria-label="Contacter sur WhatsApp"><WhatsAppMark className="whatsapp-icon" size={31}/><span>{tr(locale, "Écrivez-nous", "Chat with us")}</span></a><ChatWidget/></div></SiteContext.Provider>;
 }

@@ -4,12 +4,14 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, typ
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
+import { siteImage } from "@/lib/site-image";
+
 export type HeroSlide = { src: string; alt: string; href?: string; caption?: string };
 
 const FALLBACK = "/images/palacio-hero.jpg";
 
-export function HeroGallery({ slides, children, label, previousLabel = "Précédent", nextLabel = "Suivant", className = "" }: { slides: HeroSlide[]; children: ReactNode; label: string; previousLabel?: string; nextLabel?: string; className?: string }) {
-  const photos = slides.length ? slides : [{ src: FALLBACK, alt: label }];
+export function HeroGallery({ slides, children, label, settings, previousLabel = "Précédent", nextLabel = "Suivant", className = "" }: { slides: HeroSlide[]; children: ReactNode; label: string; settings?: { fallbackImage?: string }; previousLabel?: string; nextLabel?: string; className?: string }) {
+  const photos = slides.length ? slides : [{ src: siteImage(settings?.fallbackImage, FALLBACK), alt: label }];
   const count = photos.length;
   const loop = count > 1;
   const extended = loop ? [photos[count - 1], ...photos, photos[0]] : photos;

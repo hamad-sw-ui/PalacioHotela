@@ -189,6 +189,26 @@ BEGIN
   ) THEN
     CREATE UNIQUE INDEX users_google_sub_unique ON users (google_sub);
   END IF;
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'page_hero_image'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN page_hero_image text NOT NULL DEFAULT '';
+  END IF;
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'gallery_image_2'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN gallery_image_2 text NOT NULL DEFAULT '';
+  END IF;
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'gallery_image_3'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN gallery_image_3 text NOT NULL DEFAULT '';
+  END IF;
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'fallback_image'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN fallback_image text NOT NULL DEFAULT '';
+  END IF;
 END $$;
 UPDATE quote_requests
 SET theme_snapshot = COALESCE((SELECT theme FROM site_settings WHERE id = 1), 'forest')

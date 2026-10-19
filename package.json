@@ -2,7 +2,8 @@
   "name": "nextjs-postgresql-template",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
+    "dev:webpack": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
@@ -17,14 +18,15 @@
     "test:nav": "node --import tsx --test scripts/site-navigation.test.ts",
     "test:google": "node --import tsx --test scripts/google-settings.test.ts",
     "test:integrations": "node --import tsx --test scripts/integration-settings.test.ts",
-    "test:quote:e2e": "node --import tsx --test scripts/quote-e2e.test.ts"
+    "test:quote:e2e": "node --import tsx --test scripts/quote-e2e.test.ts",
+    "test:booking:pdf": "node --import tsx --import dotenv/config --test scripts/booking-pdf.test.ts"
   },
   "dependencies": {
     "@types/nodemailer": "^8.0.2",
     "dotenv": "17.3.1",
     "drizzle-orm": "0.45.2",
     "lucide-react": "^1.47.0",
-    "next": "16.2.6",
+    "next": "^16.2.12",
     "nodemailer": "^10.0.10",
     "pdf-lib": "^1.17.1",
     "pg": "8.20.0",
@@ -41,7 +43,7 @@
     "@types/react-dom": "19.2.3",
     "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "^16.2.12",
     "postcss": "8.5.8",
     "tailwindcss": "4.1.17",
     "typescript": "5.9.3"

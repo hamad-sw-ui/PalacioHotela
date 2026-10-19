@@ -4,6 +4,7 @@ import { bookings, type Booking } from "@/db/schema";
 import { onlinePayment } from "@/lib/booking-refund";
 import { getSettings, logActivity, notifyAdmin, notifyUser } from "@/lib/hotel";
 import { sendBookingStateEmails } from "@/lib/mail";
+import { buildBookingPdf } from "@/lib/pdf-booking";
 import { bookingAdminHref } from "@/lib/notification-links";
 import { refundCollectedCharge } from "@/lib/payments";
 
@@ -32,5 +33,15 @@ export async function markBookingPaid(booking: Booking) {
   await notifyAdmin("payment", `Paiement reçu · ${locked.reference}`, `${locked.guestName} · ${locked.total.toLocaleString("fr-FR")} XAF`, bookingAdminHref(locked.id));
   await notifyUser(locked.userId, "payment", "Votre paiement a été reçu", locked.reference || "", `/reservation/confirmation?token=${locked.publicToken}`);
   await logActivity("Paiement confirmé", "booking", locked.id, locked.guestName, locked.userId, `${locked.paymentMethod} · ${locked.reference}`);
-  await sendBookingStateEmails(locked, await getSettings(), "paid");
+  await sendBookingStateEmails(locked, await getSettings(), "paid", "", undefined, await safeBookingPdf(locked, await getSettings(), "confirmation"));
+}
+
+// A PDF failure must never block the booking flow: fall back to emails without attachment.
+export async function safeBookingPdf(booking: Booking, settings: Awaited<ReturnType<typeof getSettings>>, kind: "receipt" | "confirmation") {
+  try {
+    return await buildBookingPdf(booking, settings, kind);
+  } catch (error) {
+    console.error("[Palacio] Booking PDF generation failed:", error);
+    return undefined;
+  }
 }

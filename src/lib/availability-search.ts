@@ -21,6 +21,11 @@ export function availabilityHref(stay: AvailabilityStay) {
   return `/disponibilites?${new URLSearchParams({ checkIn: stay.checkIn, checkOut: stay.checkOut, guests: String(stay.guests) })}`;
 }
 
+export function catalogItemHref(slug: string, stay?: AvailabilityStay) {
+  const href = `/hebergements/${slug}`;
+  return stay ? `${href}?${new URLSearchParams({ checkIn: stay.checkIn, checkOut: stay.checkOut, guests: String(stay.guests) })}` : href;
+}
+
 export function reservationHref(itemId: number, stay: AvailabilityStay) {
   return `/reservation?${new URLSearchParams({ itemId: String(itemId), checkIn: stay.checkIn, checkOut: stay.checkOut, guests: String(stay.guests) })}`;
 }

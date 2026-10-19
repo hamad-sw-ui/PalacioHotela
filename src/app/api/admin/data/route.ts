@@ -2,7 +2,7 @@ import { desc, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { activityLogs, bookings, catalogItems, contactMessages, contentPages, notifications, quoteRequests, users } from "@/db/schema";
 import { getAdmin } from "@/lib/auth";
-import { getSettings } from "@/lib/hotel";
+import { expireOverdueQuotes, getSettings } from "@/lib/hotel";
 import { paymentConfiguration } from "@/lib/payments";
 import { settingsForBrowser } from "@/lib/smtp";
 import { googleAuthConfigured, googleEnvFromSettings } from "@/lib/google-auth";
@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const admin = await getAdmin();
   if (!admin) return Response.json({ error: "Non autorisé." }, { status: 401 });
+  await expireOverdueQuotes().catch((error) => console.error("[Palacio] Auto-expire quotes:", error));
   const settings = await getSettings();
   const [allBookings, allQuotes, allCatalog, allPages, allUsers, allMessages, allNotifications, allActivity] = await Promise.all([
     db.select().from(bookings).orderBy(desc(bookings.createdAt)).limit(500),

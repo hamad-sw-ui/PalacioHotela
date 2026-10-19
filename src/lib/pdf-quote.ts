@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { HotelSettings, QuoteRequest } from "@/db/schema";
 import { formatXaf, quoteLineTotal } from "@/lib/hotel";
+import { requestKindLabel } from "@/lib/request-kind";
 import { buildQuotePdfV2 } from "@/lib/pdf-quote-v2";
 import { buildQuotePdfV3 } from "@/lib/pdf-quote-v3";
 import { mergePalette, resolveQuotePalette, resolveQuoteTheme } from "@/lib/quote-pdf-theme";
@@ -55,8 +56,7 @@ export async function buildLegacyQuotePdf(quote: QuoteRequest, settings: HotelSe
   text(quote.guestPhone, 10, false, gray);
   y -= 22;
   text(isEn ? "YOUR REQUEST" : "VOTRE DEMANDE", 10, true, gold);
-  const category: Record<string, string> = { accommodation: isEn ? "Accommodation" : "Hébergement", conference_room: isEn ? "Conference room" : "Salle de conférence", event_hall: isEn ? "Event hall" : "Salle de fête", service: isEn ? "Services & leisure" : "Services & loisirs", restaurant: isEn ? "Dining" : "Restauration", mixed: isEn ? "Tailored experience" : "Expérience sur mesure" };
-  text(category[quote.requestKind] || quote.requestKind, 14, true);
+  text(requestKindLabel(quote.requestKind, quote.locale), 14, true);
   if (quote.checkIn) text(`${isEn ? "From" : "Du"} ${quote.checkIn}${quote.checkOut ? ` ${isEn ? "to" : "au"} ${quote.checkOut}` : ""}`, 10, false, gray);
   text(quote.people == null ? (isEn ? "Guests to be confirmed" : "Nombre de personnes à confirmer") : `${isEn ? "Guests" : "Personnes"} : ${quote.people}`, 10, false, gray);
   if (quote.selectedItems.length) {

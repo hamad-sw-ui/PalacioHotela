@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { quoteRequests } from "@/db/schema";
-import { getSettings, logActivity, notifyAdmin, notifyUser } from "@/lib/hotel";
+import { expireOverdueQuotes, getSettings, logActivity, notifyAdmin, notifyUser } from "@/lib/hotel";
 import { sendQuoteCancellationEmails, sendQuoteStateEmails } from "@/lib/mail";
 import { buildQuotePdf } from "@/lib/pdf-quote";
 
@@ -10,6 +10,7 @@ type Params = { params: Promise<{ token: string }> };
 
 export async function GET(_request: Request, { params }: Params) {
   const { token } = await params;
+  await expireOverdueQuotes().catch((error) => console.error("[Palacio] Auto-expire quotes:", error));
   const [quote] = await db.select().from(quoteRequests).where(eq(quoteRequests.publicToken, token)).limit(1);
   if (!quote) return Response.json({ error: "Devis introuvable." }, { status: 404 });
   const settings = await getSettings();

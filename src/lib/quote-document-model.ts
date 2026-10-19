@@ -2,6 +2,7 @@ import type { HotelSettings, QuoteRequest } from "@/db/schema";
 import { formatQuoteLineDates, formatQuoteLineMeals } from "@/lib/quote-line-display";
 import { lineMealUnits, lineUnits, quoteLineTotal, quoteTotal } from "@/lib/quote-pricing";
 import { mergePalette } from "@/lib/quote-pdf-theme";
+import { requestKindLabel } from "@/lib/request-kind";
 
 export function buildQuoteDocumentModel(
   quote: QuoteRequest,
@@ -45,7 +46,7 @@ export function buildQuoteDocumentModel(
       phone: quote.guestPhone,
     },
     project: {
-      kind: quote.requestKind,
+      kind: requestKindLabel(quote.requestKind, locale),
       checkIn: quote.checkIn,
       checkOut: quote.checkOut,
       people: quote.people,

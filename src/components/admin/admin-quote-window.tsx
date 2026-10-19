@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Check, Clock3, Download, FileText, Loader2, X } from "lucide-react";
 import { SignaturePad } from "@/components/signature-pad";
 import { formatXaf } from "@/lib/format";
+import { requestKindLabel } from "@/lib/request-kind";
 
 type QuoteLine = { name_fr: string; name_en: string; quantity: number };
 type Quote = {
@@ -92,9 +93,9 @@ export function AdminQuoteWindow({ token, reference, locale, onClose }: { token:
               </div>
               <div className="summary-card">
                 <h3>{L("Votre demande", "Your request")}</h3>
-                <div className="summary-row"><span>{L("Type", "Type")}</span><strong>{quote.requestKind.replaceAll("_", " ")}</strong></div>
+                <div className="summary-row"><span>{L("Type", "Type")}</span><strong>{requestKindLabel(quote.requestKind, locale)}</strong></div>
                 {quote.selectedItems.map((item, index) => <div className="summary-row" key={index}><span>{L("Élément", "Item")}</span><strong>{locale === "en" ? item.name_en : item.name_fr} × {item.quantity}</strong></div>)}
-                {ready && <div className="summary-row"><span>{L("Montant", "Amount")}</span><strong>{formatXaf(quote.amountTtc || 0, locale)} TTC</strong></div>}
+                {ready && <div className="summary-row"><span>{L("Montant total", "Total amount")}</span><strong>{formatXaf(quote.amountTtc || 0, locale)} TTC</strong></div>}
                 {quote.validUntil && <div className="summary-row"><span>{L("Validité", "Valid until")}</span><strong>{quote.validUntil}</strong></div>}
               </div>
               {quote.clientSignatureUrl && <p className="signature-status"><Check size={15}/> {L(`Signature numérique de ${quote.clientSignerName || quote.guestName} enregistrée.`, `Digital signature from ${quote.clientSignerName || quote.guestName} saved.`)}</p>}

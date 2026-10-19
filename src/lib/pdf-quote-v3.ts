@@ -15,7 +15,7 @@ function color(value: string) {
   return rgb(((number >> 16) & 255) / 255, ((number >> 8) & 255) / 255, (number & 255) / 255);
 }
 
-async function embedAsset(pdf: PDFDocument, url: string | null | undefined) {
+export async function embedAsset(pdf: PDFDocument, url: string | null | undefined) {
   if (!url) return null;
   try {
     const bytes = url.startsWith("http")
@@ -119,11 +119,11 @@ export async function buildQuotePdfV3(quote: QuoteRequest, settings: HotelSettin
 
   const columnTop = y;
   page.drawText(isEn ? "CLIENT" : "CLIENT", { x: left, y, size: 8, font: bold, color: accent });
-  page.drawText(isEn ? "PROJECT" : "PROJET", { x: 320, y, size: 8, font: bold, color: accent });
+  page.drawText(isEn ? "SUBJECT" : "OBJET", { x: 320, y, size: 8, font: bold, color: accent });
   y -= 16;
   page.drawText(clean(model.client.name), { x: left, y, size: 11, font: bold, color: ink });
   const period = model.project.checkIn ? `${model.project.checkIn}${model.project.checkOut ? ` - ${model.project.checkOut}` : ""}` : (isEn ? "Dates to confirm" : "Dates à confirmer");
-  page.drawText(clean(model.project.kind.replaceAll("_", " ")), { x: 320, y, size: 11, font: bold, color: ink });
+  page.drawText(clean(model.project.kind), { x: 320, y, size: 11, font: bold, color: ink });
   y -= 15;
   page.drawText(clean(model.client.company || model.client.email), { x: left, y, size: 8, font: regular, color: muted });
   const guests = model.project.people == null ? (isEn ? "Guests to confirm" : "Nombre de personnes à confirmer") : `${model.project.people} ${isEn ? "guests" : "personnes"}`;
@@ -132,8 +132,8 @@ export async function buildQuotePdfV3(quote: QuoteRequest, settings: HotelSettin
   page.drawText(clean(model.client.company ? `${model.client.email}  ·  ${model.client.phone}` : model.client.phone), { x: left, y, size: 8, font: regular, color: muted });
   y = Math.min(y, columnTop - 58);
 
-  const columns = [left, 292, 360, 430, 500];
-  const headers = isEn ? ["Description", "Qty", "Unit", "Price", "Amount"] : ["Désignation", "Qté", "Unité", "Prix", "Montant"];
+  const columns = [left, 266, 310, 382, 463];
+  const headers = isEn ? ["Description", "Qty", "Day", "Unit price", "Total amount"] : ["Désignation", "Qté", "Jour", "Prix unitaire", "Montant total"];
   room(28);
   headers.forEach((header, index) => page.drawText(header, { x: columns[index], y, size: 8, font: bold, color: primary }));
   y -= 6;

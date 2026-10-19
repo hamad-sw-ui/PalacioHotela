@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { availabilityHref, fitsGuestDemand, parseAvailabilityQuery, reservationHref, unitsNeeded } from "../src/lib/availability-search";
+import { availabilityHref, catalogItemHref, fitsGuestDemand, parseAvailabilityQuery, reservationHref, unitsNeeded } from "../src/lib/availability-search";
 
 function iso(offsetDays: number) {
   const date = new Date();
@@ -23,6 +23,8 @@ test("guest count consumes as many free units as the capacity requires", () => {
 test("availability search keeps dates and guests on a public results page", () => {
   const stay = { checkIn: iso(10), checkOut: iso(12), guests: 4 };
   assert.equal(availabilityHref(stay), `/disponibilites?checkIn=${stay.checkIn}&checkOut=${stay.checkOut}&guests=4`);
+  assert.equal(catalogItemHref("suite-junior", stay), `/hebergements/suite-junior?checkIn=${stay.checkIn}&checkOut=${stay.checkOut}&guests=4`);
+  assert.equal(catalogItemHref("suite-junior"), "/hebergements/suite-junior");
   assert.equal(reservationHref(7, stay), `/reservation?itemId=7&checkIn=${stay.checkIn}&checkOut=${stay.checkOut}&guests=4`);
   assert.deepEqual(parseAvailabilityQuery({ checkIn: stay.checkIn, checkOut: stay.checkOut, guests: "4" }), stay);
   assert.equal(parseAvailabilityQuery({ checkIn: stay.checkIn, guests: "2" }), null);

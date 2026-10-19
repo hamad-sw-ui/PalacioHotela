@@ -52,8 +52,25 @@ Configurer `AI_API_KEY` / `OPENAI_API_KEY` et éventuellement `AI_BASE_URL`, `AI
 
 Le backoffice permet d'importer des JPEG, PNG ou WebP (5 Mo maximum) via une route protégée. Les fichiers sont stockés localement dans `public/uploads/media/` et servis par `/api/media/`. Pour un déploiement avec stockage éphémère, raccorder cette route à un stockage persistant (S3 ou équivalent) avant production.
 
+### Transfert vers une autre machine
+
+Le script PowerShell `scripts/transfer-data.ps1` sauvegarde la base PostgreSQL et les médias importés dans un dossier de transfert. Depuis la racine du projet, remplacez `E:` par la lettre de la clé USB :
+
+```powershell
+.\scripts\transfer-data.ps1 -Action backup -Path E:\
+```
+
+Copiez aussi le projet sur l'autre machine. Installez PostgreSQL, configurez le fichier `.env` du projet pour pointer `DATABASE_URL` vers la base PostgreSQL de cette machine, puis lancez depuis la racine du projet :
+
+```powershell
+.\scripts\transfer-data.ps1 -Action restore -Path "E:\PalacioBackup-AAAAMMJJ-HHMMSS"
+```
+
+La restauration crée la base si elle n'existe pas. Si elle existe déjà, le script demande confirmation et remplace ses tables. Le fichier `.env` et les secrets ne sont pas inclus dans la sauvegarde. Les brouillons et sessions stockés dans le navigateur ne sont pas transférés. Protégez la clé USB : le dump contient les données du site.
+
 ## Notes
 
 - Données et montants du devis en XAF TTC ; pas de ventilation TVA ni génération de facture.
 - Les réservations `pending` bloquent les disponibilités jusqu'à traitement manuel ; une demande de devis n'effectue pas de pré-réservation.
 - Variables secrètes uniquement côté serveur. Ne jamais exposer les clés de paiement, SMTP et IA dans le navigateur.
+- Les réservations confirmées passent automatiquement à « séjour en cours » le jour d’arrivée et à « séjour terminé » le jour du départ, selon le fuseau `Africa/Douala`. Sur Vercel, le Cron Job défini dans `vercel.json` exécute cette mise à jour chaque jour à 01:15, heure de Douala. Définir `CRON_SECRET` avec un secret aléatoire dans les variables d’environnement de production. Sur un autre hébergeur, planifier un appel GET quotidien à `/api/cron/booking-status` avec l’en-tête `Authorization: Bearer <CRON_SECRET>`. Les réservations en attente et annulées ne sont jamais avancées automatiquement.

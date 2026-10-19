@@ -4,6 +4,7 @@ import type { Booking, HotelSettings, QuoteRequest } from "@/db/schema";
 import { formatXaf } from "@/lib/format";
 import { emailLogoDelivery, emailPalette, themedEmailHtml } from "@/lib/email-theme";
 import { smtpEnvFromSettings, smtpFromAddress, smtpTransportOptions } from "@/lib/smtp";
+import { requestKindLabel } from "@/lib/request-kind";
 
 const escapeHtml = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] || c);
 
@@ -18,17 +19,7 @@ export function mailDate(value: string | null | undefined, locale: string) {
   return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString(locale === "en" ? "en-GB" : "fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 }
 
-export function requestKindLabel(kind: string, locale: string) {
-  const labels: Record<string, [string, string]> = {
-    accommodation: ["Hébergement", "Accommodation"],
-    conference_room: ["Salle de conférence", "Conference room"],
-    event_hall: ["Salle de fête", "Event hall"],
-    service: ["Services et loisirs", "Services and leisure"],
-    restaurant: ["Restauration", "Dining"],
-    mixed: ["Expérience sur mesure", "Tailored experience"],
-  };
-  return labels[kind]?.[locale === "en" ? 1 : 0] || kind.replaceAll("_", " ");
-}
+export { requestKindLabel } from "@/lib/request-kind";
 
 function paymentMethodLabel(method: string, en: boolean) {
   if (method === "cash") return en ? "Pay at the hotel" : "Paiement sur place";
@@ -107,12 +98,13 @@ export async function sendHotelMail(to: string, subject: string, html: string, s
   } catch (error) { console.error("[Palacio] SMTP delivery failed:", error); return false; }
 }
 
-export async function sendBookingEmails(booking: Booking, settings: HotelSettings, origin = "") {
+export async function sendBookingEmails(booking: Booking, settings: HotelSettings, origin = "", pdf?: Uint8Array) {
   const en = booking.locale === "en";
   const detail = bookingMailDetail(booking);
+  const attachment = pdf ? [{ filename: `${booking.reference || "reservation"}-recu.pdf`, content: Buffer.from(pdf) }] : undefined;
   await Promise.all([
-    sendHotelMail(booking.guestEmail, en ? `Your request ${booking.reference} · ${settings.hotelName}` : `Votre demande ${booking.reference} · ${settings.hotelName}`, template({ ...settings, mailOrigin: origin }, en ? "BOOKING REQUEST" : "DEMANDE DE RÉSERVATION", en ? "Your stay begins here" : "Votre séjour commence ici", en ? `Dear ${booking.guestName},` : `Cher/chère ${booking.guestName},`, en ? `Thank you for choosing ${settings.hotelName}. Your request has been received and our team will confirm availability shortly.` : `Merci d’avoir choisi ${settings.hotelName}. Votre demande a bien été reçue ; notre équipe vous confirmera la disponibilité dans les meilleurs délais.`, detail, en ? "We look forward to welcoming you. This request is subject to confirmation by our team." : "Au plaisir de vous accueillir. Cette demande reste soumise à la confirmation de notre équipe."), settings),
-    sendHotelMail(settings.email, `Nouvelle réservation ${booking.reference} · ${booking.guestName}`, template({ ...settings, mailOrigin: origin }, "NOUVELLE RÉSERVATION", "Une nouvelle demande vous attend", `Bonjour l’équipe ${settings.hotelName},`, `${booking.guestName} vient de demander une réservation. Consultez le backoffice pour la traiter.`, `${detail}<br>${escapeHtml(booking.guestEmail)} · ${escapeHtml(booking.guestPhone)}${booking.notes ? `<br>${escapeHtml(booking.notes)}` : ""}`, "Rendez-vous dans le backoffice pour confirmer ou modifier cette demande."), settings),
+    sendHotelMail(booking.guestEmail, en ? `Your request ${booking.reference} · ${settings.hotelName}` : `Votre demande ${booking.reference} · ${settings.hotelName}`, template({ ...settings, mailOrigin: origin }, en ? "BOOKING REQUEST" : "DEMANDE DE RÉSERVATION", en ? "Your stay begins here" : "Votre séjour commence ici", en ? `Dear ${booking.guestName},` : `Cher/chère ${booking.guestName},`, en ? `Thank you for choosing ${settings.hotelName}. Your request has been received and our team will confirm availability shortly.` : `Merci d’avoir choisi ${settings.hotelName}. Votre demande a bien été reçue ; notre équipe vous confirmera la disponibilité dans les meilleurs délais.`, detail, en ? "We look forward to welcoming you. This request is subject to confirmation by our team." : "Au plaisir de vous accueillir. Cette demande reste soumise à la confirmation de notre équipe."), settings, attachment),
+    sendHotelMail(settings.email, `Nouvelle réservation ${booking.reference} · ${booking.guestName}`, template({ ...settings, mailOrigin: origin }, "NOUVELLE RÉSERVATION", "Une nouvelle demande vous attend", `Bonjour l’équipe ${settings.hotelName},`, `${booking.guestName} vient de demander une réservation. Consultez le backoffice pour la traiter.`, `${detail}<br>${escapeHtml(booking.guestEmail)} · ${escapeHtml(booking.guestPhone)}${booking.notes ? `<br>${escapeHtml(booking.notes)}` : ""}`, "Rendez-vous dans le backoffice pour confirmer ou modifier cette demande."), settings, attachment),
   ]);
 }
 
@@ -171,13 +163,14 @@ const bookingStateCopy = (booking: Booking, status: string, outcome?: Cancellati
   return { en, detail, state };
 };
 
-export async function sendBookingStateEmails(booking: Booking, settings: HotelSettings, status: string, origin = "", outcome?: CancellationOutcome) {
+export async function sendBookingStateEmails(booking: Booking, settings: HotelSettings, status: string, origin = "", outcome?: CancellationOutcome, pdf?: Uint8Array) {
   const { en, detail, state } = bookingStateCopy(booking, status, outcome);
+  const attachment = pdf ? [{ filename: `${booking.reference || "reservation"}-confirmation.pdf`, content: Buffer.from(pdf) }] : undefined;
   const index = en ? 1 : 0;
   const adminPayment = status === "cancelled" ? adminCancellationPaymentNote(booking, outcome) : "Retrouvez cette réservation dans le backoffice.";
   await Promise.all([
-    sendHotelMail(booking.guestEmail, `${booking.reference} · ${state.title[index]} · ${settings.hotelName}`, template({ ...settings, mailOrigin: origin }, state.eyebrow[index], state.title[index], en ? `Dear ${booking.guestName},` : `Cher/chère ${booking.guestName},`, state.body[index], detail, state.footer[index]), settings),
-    sendHotelMail(settings.email, `${booking.reference} · ${state.eyebrow[0]} · ${booking.guestName}`, template({ ...settings, mailOrigin: origin }, state.eyebrow[0], state.title[0], `Bonjour l’équipe ${settings.hotelName},`, state.admin, `${detail}<br>${escapeHtml(booking.guestEmail)} · ${escapeHtml(booking.guestPhone)}`, adminPayment), settings),
+    sendHotelMail(booking.guestEmail, `${booking.reference} · ${state.title[index]} · ${settings.hotelName}`, template({ ...settings, mailOrigin: origin }, state.eyebrow[index], state.title[index], en ? `Dear ${booking.guestName},` : `Cher/chère ${booking.guestName},`, state.body[index], detail, state.footer[index]), settings, attachment),
+    sendHotelMail(settings.email, `${booking.reference} · ${state.eyebrow[0]} · ${booking.guestName}`, template({ ...settings, mailOrigin: origin }, state.eyebrow[0], state.title[0], `Bonjour l’équipe ${settings.hotelName},`, state.admin, `${detail}<br>${escapeHtml(booking.guestEmail)} · ${escapeHtml(booking.guestPhone)}`, adminPayment), settings, attachment),
   ]);
 }
 
@@ -185,11 +178,11 @@ const quoteStateCopy = (quote: QuoteRequest, status: string) => {
   const en = quote.locale === "en";
   const detail = quoteMailDetail(quote);
   const states: Record<string, { eyebrow: [string, string]; title: [string, string]; body: [string, string]; admin: string }> = {
-    in_review: { eyebrow: ["DEVIS EN ÉTUDE", "QUOTE UNDER REVIEW"], title: ["Votre demande est à l’étude", "Your request is under review"], body: ["Notre équipe prépare une proposition adaptée à votre projet.", "Our team is preparing a proposal tailored to your plans."], admin: `${quote.guestName} attend l’étude de son devis.` },
+    in_review: { eyebrow: ["DEVIS EN ÉTUDE", "QUOTE UNDER REVIEW"], title: ["Votre demande est à l’étude", "Your request is under review"], body: ["Notre équipe prépare une proposition adaptée à votre objet.", "Our team is preparing a proposal tailored to your plans."], admin: `${quote.guestName} attend l’étude de son devis.` },
     quote_sent: { eyebrow: ["DEVIS ENVOYÉ", "QUOTE SENT"], title: ["Le devis a été transmis", "The quote has been sent"], body: ["Votre proposition personnalisée est disponible.", "Your personalized proposal is available."], admin: `Le devis de ${quote.guestName} a été envoyé.` },
     negotiating: { eyebrow: ["DEVIS EN DISCUSSION", "QUOTE UNDER DISCUSSION"], title: ["Votre devis est en discussion", "Your quote is under discussion"], body: ["Nous restons à votre écoute pour ajuster la proposition.", "We remain available to adjust the proposal."], admin: `Le devis de ${quote.guestName} est en discussion.` },
     accepted: { eyebrow: ["DEVIS ACCEPTÉ", "QUOTE ACCEPTED"], title: ["Votre acceptation est enregistrée", "Your acceptance is confirmed"], body: ["Merci. Votre acceptation est enregistrée. Le devis signé est joint à cet e-mail lorsqu’il est disponible.", "Thank you. Your acceptance is recorded. The signed quote is attached when available."], admin: `${quote.guestName} a accepté le devis${quote.amountTtc ? ` de ${formatXaf(quote.amountTtc, "fr")}` : ""}.` },
-    rejected: { eyebrow: ["DEVIS REFUSÉ", "QUOTE DECLINED"], title: ["Votre devis a été refusé", "Your quote has been declined"], body: ["Cette proposition n’est plus d’actualité. Notre équipe reste disponible pour un nouveau projet.", "This proposal is no longer active. Our team remains available for a new project."], admin: `Le devis de ${quote.guestName} a été refusé.` },
+    rejected: { eyebrow: ["DEVIS REFUSÉ", "QUOTE DECLINED"], title: ["Votre devis a été refusé", "Your quote has been declined"], body: ["Cette proposition n’est plus d’actualité. Notre équipe reste disponible pour un nouvel objet.", "This proposal is no longer active. Our team remains available for a new project."], admin: `Le devis de ${quote.guestName} a été refusé.` },
     expired: { eyebrow: ["DEVIS EXPIRÉ", "QUOTE EXPIRED"], title: ["Votre devis a expiré", "Your quote has expired"], body: ["La date de validité est dépassée. Contactez-nous si vous souhaitez une nouvelle proposition.", "The validity date has passed. Contact us if you would like a new proposal."], admin: `Le devis de ${quote.guestName} a expiré.` },
   };
   const state = states[status] || { eyebrow: ["MISE À JOUR", "UPDATE"], title: ["Des nouvelles de votre devis", "News about your quote"], body: ["Le statut de votre devis a été mis à jour.", "The status of your quote has been updated."], admin: `Le devis de ${quote.guestName} a changé d’état (${status}).` };

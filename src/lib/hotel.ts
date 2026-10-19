@@ -24,6 +24,7 @@ export async function getSettings() {
       heroSubtitleFr: "Au cœur de Douala, découvrez une adresse où l’élégance rencontre la chaleur de l’hospitalité.",
       heroSubtitleEn: "In the heart of Douala, discover a place where elegance meets the warmth of hospitality.",
       aboutFr: "Plus qu’un hôtel, une destination.", aboutEn: "More than a hotel, a destination.", aboutImage: "/images/palacio-dining.jpg",
+      pageHeroImage: "", galleryImage2: "", galleryImage3: "", fallbackImage: "",
       theme: "forest", themeColors: null, email: "bonjour@palaciohotel.com", phone: "+237 6 99 00 00 00", whatsapp: "237699000000", instagramUrl: "",
       addressFr: "Bonanjo, Douala, Cameroun", addressEn: "Bonanjo, Douala, Cameroon", latitude: 4.0511, longitude: 9.7679,
       acceptingQuotes: true, aiProvider: "auto", aiBaseUrl: "", aiModel: "", aiApiKey: "", quoteSignatureUrl: "", quoteStampUrl: "", quoteHeaderImageUrl: "", quoteSignerName: "", quoteSignerRole: "", quoteTermsFr: "", quoteTermsEn: "", smtpHost: "", smtpPort: 587, smtpSecure: false, smtpRequireTls: true, smtpUser: "", smtpPassword: "", smtpFrom: "", stripeSecretKey: "", stripeWebhookSecret: "", paypalClientId: "", paypalClientSecret: "", paypalEnv: "sandbox", paypalXafPerEur: 655.957, googleClientId: "", googleClientSecret: "", updatedAt: new Date(),
@@ -192,4 +193,22 @@ export async function findActiveUserIdByEmail(email: string) {
 export async function notifyUser(userId: number | null | undefined, type: string, title: string, message: string, href: string) {
   if (!userId) return;
   await db.insert(notifications).values({ userId, type, title, message, href });
+}
+
+/** Automatic quote lifecycle: mark overdue quotes as expired (idempotent).
+ *  A quote is overdue when it has been sent (quote_sent or negotiating)
+ *  and its validity date has passed. Returns the expired quotes. */
+export async function expireOverdueQuotes() {
+  const today = new Date().toISOString().slice(0, 10);
+  const overdue = await db.select({ id: quoteRequests.id, reference: quoteRequests.reference, guestName: quoteRequests.guestName, userId: quoteRequests.userId, publicToken: quoteRequests.publicToken }).from(quoteRequests)
+    .where(and(inArray(quoteRequests.status, ["quote_sent", "negotiating"]), lt(quoteRequests.validUntil, today)));
+  if (!overdue.length) return [];
+  const ids = overdue.map((row) => row.id);
+  const rows = await db.update(quoteRequests).set({ status: "expired", updatedAt: new Date() }).where(inArray(quoteRequests.id, ids)).returning({ id: quoteRequests.id, reference: quoteRequests.reference });
+  for (const quote of rows) {
+    await logActivity("Devis expiré automatiquement", "quote", quote.id, "Système", null, quote.reference || "");
+    await notifyUser(overdue.find((row) => row.id === quote.id)?.userId, "quote", "Votre devis a expiré", quote.reference || "", `/devis/suivi?token=${overdue.find((row) => row.id === quote.id)?.publicToken || ""}`);
+    await notifyAdmin("quote", `Devis expiré · ${quote.reference || ""}`, `Le devis de ${overdue.find((row) => row.id === quote.id)?.guestName || ""} a dépassé sa date de validité.`, `/admin?section=devis&quote=${quote.id}`);
+  }
+  return rows;
 }
