@@ -63,6 +63,7 @@ export const siteSettings = pgTable("site_settings", {
   phone: varchar("phone", { length: 60 }).notNull().default("+237 6 99 00 00 00"),
   whatsapp: varchar("whatsapp", { length: 60 }).notNull().default("237699000000"),
   instagramUrl: text("instagram_url").notNull().default(""),
+  facebookUrl: text("facebook_url").notNull().default(""),
   addressFr: text("address_fr").notNull().default("Bonanjo, Douala, Cameroun"),
   addressEn: text("address_en").notNull().default("Bonanjo, Douala, Cameroon"),
   latitude: doublePrecision("latitude").notNull().default(4.0511),

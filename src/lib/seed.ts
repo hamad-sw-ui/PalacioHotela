@@ -108,6 +108,11 @@ BEGIN
     ALTER TABLE site_settings ADD COLUMN instagram_url text NOT NULL DEFAULT '';
   END IF;
   IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'facebook_url'
+  ) THEN
+    ALTER TABLE site_settings ADD COLUMN facebook_url text NOT NULL DEFAULT '';
+  END IF;
+  IF to_regclass('site_settings') IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = 'smtp_host'
   ) THEN
     ALTER TABLE site_settings ADD COLUMN smtp_host text NOT NULL DEFAULT '';

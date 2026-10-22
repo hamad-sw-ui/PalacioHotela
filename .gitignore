@@ -34,3 +34,8 @@ dev-server*.log
 
 test-out.txt
 tsc-check.txt
+build-log.txt
+build-output.txt
+build-out2.txt
+lint-out.txt
+typecheck-out.txt

@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { ArrowRight, Camera, Mail, MapPin, Menu, Phone, UserRound, X } from "lucide-react";
+import { ArrowRight, Mail, MapPin, Menu, Phone, UserRound, X } from "lucide-react";
 import type { HotelSettings } from "@/db/schema";
 import { ChatWidget } from "@/components/chat-widget";
 import { hotelEmailUrl, hotelMapUrl, hotelPhoneUrl } from "@/lib/contact";
@@ -12,6 +12,7 @@ import { memberHref } from "@/lib/member-gate";
 import { rememberSitePath } from "@/lib/site-navigation";
 import { whatsappUrl } from "@/lib/whatsapp";
 import { WhatsAppMark } from "@/components/whatsapp-mark";
+import { FacebookMark, InstagramMark } from "@/components/social-marks";
 import { mergePalette, paletteIsCustom } from "@/lib/quote-pdf-theme";
 import { themeVariableStyle } from "@/lib/platform-colors";
 
@@ -117,7 +118,48 @@ function Header() {
 function Footer() {
   const { settings, locale, member } = useSite();
   const mapLink = hotelMapUrl(settings);
-  return <footer className="site-footer"><div className="container"><div className="footer-top"><div className="footer-brand"><Link href="/"><Brand settings={settings} light/></Link><p>{tr(locale, "Une adresse singulière, des instants inoubliables. Bienvenue chez vous, à Douala.", "An extraordinary address, unforgettable moments. Welcome home in Douala.")}</p><div className="footer-social"><a href={whatsappUrl(settings.whatsapp, tr(locale, "Bonjour Palacio Hotel, j'aimerais vous contacter.", "Hello Palacio Hotel, I would like to contact you."))} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp">WA</a><a href={settings.instagramUrl || "https://instagram.com"} target="_blank" rel="noopener noreferrer" aria-label="Instagram"><Camera size={17}/></a></div></div><div className="footer-col"><h4>{tr(locale, "Explorer", "Explore")}</h4><Link href="/hebergements?categorie=accommodation">{tr(locale, "Nos hébergements", "Accommodation")}</Link><Link href="/hebergements?categorie=events">{tr(locale, "Salles & événements", "Meetings & events")}</Link><Link href="/hebergements?categorie=service">{tr(locale, "Services & loisirs", "Services & leisure")}</Link><Link href="/pages/notre-histoire">{tr(locale, "Notre histoire", "Our story")}</Link></div><div className="footer-col"><h4>{tr(locale, "Votre séjour", "Your stay")}</h4><Link href={memberHref(member === true, "/reservation")}>{tr(locale, "Réserver un séjour", "Make a booking")}</Link><Link href={memberHref(member === true, "/devis")}>{tr(locale, "Demander un devis", "Request a quote")}</Link><Link href="/compte">{tr(locale, "Mon compte", "My account")}</Link><Link href="/contact">{tr(locale, "Nous contacter", "Contact us")}</Link></div><div className="footer-col footer-contact"><h4>{tr(locale, "Nous trouver", "Find us")}</h4><a href={mapLink} target="_blank" rel="noopener noreferrer"><MapPin size={16}/>{locale === "en" ? settings.addressEn : settings.addressFr}</a><a href={hotelPhoneUrl(settings)}><Phone size={16}/>{settings.phone}</a><a href={hotelEmailUrl(settings)}><Mail size={16}/>{settings.email}</a></div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} {settings.hotelName}. {tr(locale, "Tous droits réservés.", "All rights reserved.")}</span><div><Link href="/pages/confidentialite">{tr(locale, "Confidentialité", "Privacy")}</Link><Link href="/admin">Backoffice</Link><span>FR / EN</span></div></div></div></footer>;
+  const facebookHref = settings.facebookUrl || "https://facebook.com";
+  return (
+    <footer className="site-footer">
+      <div className="container">
+        <div className="footer-top">
+          <div className="footer-brand">
+            <Link href="/"><Brand settings={settings} light/></Link>
+            <p>{tr(locale, "Une adresse singulière, des instants inoubliables. Bienvenue chez vous, à Douala.", "An extraordinary address, unforgettable moments. Welcome home in Douala.")}</p>
+            <div className="footer-social">
+              <a href={whatsappUrl(settings.whatsapp, tr(locale, "Bonjour Palacio Hotel, j'aimerais vous contacter.", "Hello Palacio Hotel, I would like to contact you."))} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp"><WhatsAppMark size={18}/></a>
+              <a href={settings.instagramUrl || "https://instagram.com"} target="_blank" rel="noopener noreferrer" aria-label="Instagram"><InstagramMark size={17}/></a>
+              <a href={facebookHref} target="_blank" rel="noopener noreferrer" aria-label="Facebook"><FacebookMark size={17}/></a>
+            </div>
+          </div>
+          <div className="footer-col">
+            <h4>{tr(locale, "Explorer", "Explore")}</h4>
+            <Link href="/hebergements?accommodation">{tr(locale, "Nos hébergements", "Accommodation")}</Link>
+            <Link href="/hebergements?events">{tr(locale, "Salles & événements", "Meetings & events")}</Link>
+            <Link href="/hebergements?service">{tr(locale, "Services & loisirs", "Services & leisure")}</Link>
+            <Link href="/pages/notre-histoire">{tr(locale, "Notre histoire", "Our story")}</Link>
+          </div>
+          <div className="footer-col">
+            <h4>{tr(locale, "Votre séjour", "Your stay")}</h4>
+            <Link href={memberHref(member === true, "/reservation")}>{tr(locale, "Réserver un séjour", "Make a booking")}</Link>
+            <Link href={memberHref(member === true, "/devis")}>{tr(locale, "Demander un devis", "Request a quote")}</Link>
+            <Link href="/compte">{tr(locale, "Mon compte", "My account")}</Link>
+            <Link href="/contact">{tr(locale, "Nous contacter", "Contact us")}</Link>
+          </div>
+          <div className="footer-col footer-contact">
+            <h4>{tr(locale, "Nous trouver", "Find us")}</h4>
+            <a href={mapLink} target="_blank" rel="noopener noreferrer"><MapPin size={16}/>{locale === "en" ? settings.addressEn : settings.addressFr}</a>
+            <a href={hotelPhoneUrl(settings)}><Phone size={16}/>{settings.phone}</a>
+            <a href={hotelEmailUrl(settings)}><Mail size={16}/>{settings.email}</a>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <span>© {new Date().getFullYear()} {settings.hotelName}. {tr(locale, "Tous droits réservés.", "All rights reserved.")}</span>
+          <div><Link href="/pages/confidentialite">{tr(locale, "Confidentialité", "Privacy")}</Link><Link href="/admin">Backoffice</Link><span>FR / EN</span></div>
+        </div>
+      </div>
+    </footer>
+  );
 }
 
 export function SiteShell({ settings, children }: { settings: HotelSettings; children: ReactNode }) {

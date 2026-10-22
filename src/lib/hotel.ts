@@ -25,7 +25,7 @@ export async function getSettings() {
       heroSubtitleEn: "In the heart of Douala, discover a place where elegance meets the warmth of hospitality.",
       aboutFr: "Plus qu’un hôtel, une destination.", aboutEn: "More than a hotel, a destination.", aboutImage: "/images/palacio-dining.jpg",
       pageHeroImage: "", galleryImage2: "", galleryImage3: "", fallbackImage: "",
-      theme: "forest", themeColors: null, email: "bonjour@palaciohotel.com", phone: "+237 6 99 00 00 00", whatsapp: "237699000000", instagramUrl: "",
+      theme: "forest", themeColors: null, email: "bonjour@palaciohotel.com", phone: "+237 6 99 00 00 00", whatsapp: "237699000000", instagramUrl: "", facebookUrl: "",
       addressFr: "Bonanjo, Douala, Cameroun", addressEn: "Bonanjo, Douala, Cameroon", latitude: 4.0511, longitude: 9.7679,
       acceptingQuotes: true, aiProvider: "auto", aiBaseUrl: "", aiModel: "", aiApiKey: "", quoteSignatureUrl: "", quoteStampUrl: "", quoteHeaderImageUrl: "", quoteSignerName: "", quoteSignerRole: "", quoteTermsFr: "", quoteTermsEn: "", smtpHost: "", smtpPort: 587, smtpSecure: false, smtpRequireTls: true, smtpUser: "", smtpPassword: "", smtpFrom: "", stripeSecretKey: "", stripeWebhookSecret: "", paypalClientId: "", paypalClientSecret: "", paypalEnv: "sandbox", paypalXafPerEur: 655.957, googleClientId: "", googleClientSecret: "", updatedAt: new Date(),
     };
