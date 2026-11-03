@@ -130,3 +130,73 @@ test("a Stripe probe never returns the secret and can confirm the key without th
   assert.equal(failed.error?.includes("sk_test_page"), false);
   assert.match(redactStripeError(new Error("auth sk_test_page refused"), ["sk_test_page"]), /••••/);
 });
+
+// ---------------------------------------------------------------------------
+// Duplicate-payment protection: retry serialisation and stale session expiry
+// ---------------------------------------------------------------------------
+import { openBookingPayment } from "@/lib/payment-open-core";
+import type { Booking } from "@/db/schema";
+
+const payableBooking = (overrides: Partial<Pick<Booking, "id" | "paymentMethod" | "paymentStatus" | "paymentRef" | "status">> = {}): Booking => ({
+  id: 7,
+  paymentMethod: "card",
+  paymentStatus: "awaiting_payment",
+  paymentRef: "cs_old_session",
+  status: "pending",
+  ...overrides,
+} as Booking);
+
+test("a card retry expires the previous open Stripe session before creating the new one", async () => {
+  const calls: string[] = [];
+  const outcome = await openBookingPayment(payableBooking(), "https://palacio.test", {
+    expireSession: async (sessionId) => { calls.push(`expire:${sessionId}`); },
+    create: async () => { calls.push("create"); return { url: "https://checkout.stripe.com/new", reference: "cs_new_session", amount: 100000, currency: "EUR" }; },
+    persist: async () => { calls.push("persist"); return true; },
+  });
+  assert.deepEqual(outcome, { kind: "opened", url: "https://checkout.stripe.com/new" });
+  assert.deepEqual(calls, ["expire:cs_old_session", "create", "persist"]);
+});
+
+test("a first card attempt never touches session expiry", async () => {
+  const expired: (string | null | undefined)[] = [];
+  const outcome = await openBookingPayment(payableBooking({ paymentStatus: "unpaid", paymentRef: null }), "https://palacio.test", {
+    expireSession: async (sessionId) => { expired.push(sessionId); },
+    create: async () => ({ url: "https://checkout.stripe.com/first", reference: "cs_first", amount: 100000, currency: "EUR" }),
+    persist: async () => true,
+  });
+  assert.deepEqual(outcome, { kind: "opened", url: "https://checkout.stripe.com/first" });
+  assert.deepEqual(expired, []);
+});
+
+test("a concurrent retry losing the race is reported as a conflict, never a second charge link", async () => {
+  const outcome = await openBookingPayment(payableBooking({ paymentStatus: "paid" }), "https://palacio.test", {
+    expireSession: async () => {},
+    create: async () => ({ url: "https://checkout.stripe.com/late", reference: "cs_late", amount: 100000, currency: "EUR" }),
+    persist: async () => false,
+  });
+  assert.deepEqual(outcome.kind, "conflict");
+});
+
+test("a gateway failure keeps the booking untouched and surfaces the hotel contact error", async () => {
+  const persisted: number[] = [];
+  const outcome = await openBookingPayment(payableBooking(), "https://palacio.test", {
+    expireSession: async () => {},
+    create: async () => { throw new Error("stripe down"); },
+    persist: async (id) => { persisted.push(id); return true; },
+  });
+  assert.deepEqual(outcome, { kind: "failed", error: "Impossible d'ouvrir le paiement. Contactez l'hôtel." });
+  assert.deepEqual(persisted, []);
+});
+
+test("a PayPal retry goes through the same serialisation without Stripe expiry", async () => {
+  const expired: (string | null | undefined)[] = [];
+  const created: string[] = [];
+  const outcome = await openBookingPayment(payableBooking({ paymentMethod: "paypal", paymentRef: "ORDER_OLD" }), "https://palacio.test", {
+    expireSession: async (sessionId) => { expired.push(sessionId); },
+    create: async () => { created.push("paypal"); return { url: "https://paypal.test/approve", reference: "ORDER_NEW", amount: 1250, currency: "EUR" }; },
+    persist: async () => true,
+  });
+  assert.deepEqual(outcome, { kind: "opened", url: "https://paypal.test/approve" });
+  assert.deepEqual(expired, []);
+  assert.deepEqual(created, ["paypal"]);
+});

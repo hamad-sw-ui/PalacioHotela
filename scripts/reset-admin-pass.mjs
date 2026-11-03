@@ -1,0 +1,10 @@
+import { Pool } from "pg";
+import { scryptSync, randomBytes } from "node:crypto";
+import { config } from "dotenv";
+config();
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const salt = randomBytes(16).toString("hex");
+const hash = `scrypt:${salt}:${scryptSync("Palacio-2026", salt, 64).toString("hex")}`;
+await pool.query("update users set password_hash = $1 where id = 1", [hash]);
+console.log("password reset for user 1");
+await pool.end();

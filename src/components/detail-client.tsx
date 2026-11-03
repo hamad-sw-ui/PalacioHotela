@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, ArrowUpRight, Banknote, CalendarDays, Check, CheckCircle2, CreditCard, Info, Loader2, MessageCircle, ShieldCheck, Users, Wallet } from "lucide-react";
@@ -10,7 +10,7 @@ import { ItemCard } from "@/components/item-card";
 import { itemSlides } from "@/lib/catalog-gallery";
 import { normalizeCatalogFeatures } from "@/lib/catalog-features";
 import { siteImage } from "@/lib/site-image";
-import { BOOKING_UNIT_LIMIT, unitsNeeded, type AvailabilityStay } from "@/lib/availability-search";
+import { BOOKING_UNIT_LIMIT, parseAvailabilityQuery, unitsNeeded } from "@/lib/availability-search";
 import { authFetch } from "@/lib/client-session";
 import { daysBetween, formatXaf, validDateRange } from "@/lib/format";
 import { memberHref, signInHref } from "@/lib/member-gate";
@@ -20,16 +20,20 @@ import { tr, useSite, whatsappUrl } from "@/components/site-shell";
 type Method = "cash" | "card" | "paypal";
 type Account = { fullName: string; email: string; phone?: string | null };
 
-export function DetailClient({ item, related, config, initialStay }: { item: CatalogItem; related: CatalogItem[]; items: CatalogItem[]; config: { card: boolean; paypal: boolean; cash: boolean; paypalRate: number | null; stripeRate?: number | null }; initialStay?: AvailabilityStay }) {
+export function DetailClient({ item, related, config }: { item: CatalogItem; related: CatalogItem[]; config: { card: boolean; paypal: boolean; cash: boolean; paypalRate: number | null; stripeRate?: number | null } }) {
   const { locale, settings, member } = useSite();
   const router = useRouter();
   const pathname = usePathname();
   const search = useSearchParams();
+  // The static detail page no longer receives search params server-side, so the client
+  // restores the prefill itself: ?checkIn/&checkOut/&guests from the availability search
+  // take priority (same behaviour as before), then the session draft, then defaults.
+  const urlStay = useMemo(() => parseAvailabilityQuery({ checkIn: search.get("checkIn") || undefined, checkOut: search.get("checkOut") || undefined, guests: search.get("guests") || undefined }), [search]);
   const draftKey = `palacio_detail_book_${item.id}`;
-  const [checkIn, setCheckIn] = useState(initialStay?.checkIn || "");
-  const [checkOut, setCheckOut] = useState(initialStay?.checkOut || "");
-  const [guests, setGuests] = useState(initialStay?.guests ?? Math.min(item.capacity, 2));
-  const [quantity, setQuantity] = useState(initialStay ? Math.min(BOOKING_UNIT_LIMIT, unitsNeeded(item.capacity, initialStay.guests) ?? 1) : 1);
+  const [checkIn, setCheckIn] = useState(urlStay?.checkIn || "");
+  const [checkOut, setCheckOut] = useState(urlStay?.checkOut || "");
+  const [guests, setGuests] = useState(urlStay?.guests ?? Math.min(item.capacity, 2));
+  const [quantity, setQuantity] = useState(urlStay ? Math.min(BOOKING_UNIT_LIMIT, unitsNeeded(item.capacity, urlStay.guests) ?? 1) : 1);
   const [notes, setNotes] = useState("");
   const [method, setMethod] = useState<Method>(config.cash ? "cash" : config.card ? "card" : "paypal");
   const [consent, setConsent] = useState(false);
@@ -53,7 +57,7 @@ export function DetailClient({ item, related, config, initialStay }: { item: Cat
     try {
       const saved = JSON.parse(sessionStorage.getItem(draftKey) || "null") as Record<string, unknown> | null;
       if (saved && typeof saved === "object") {
-        if (!initialStay) {
+        if (!urlStay) {
           if (typeof saved.checkIn === "string") setCheckIn(saved.checkIn);
           if (typeof saved.checkOut === "string") setCheckOut(saved.checkOut);
           if (typeof saved.guests === "number") setGuests(Math.min(500, Math.max(1, saved.guests)));
@@ -65,7 +69,7 @@ export function DetailClient({ item, related, config, initialStay }: { item: Cat
       }
     } catch { /* a broken draft must not block the page */ }
     setDraftReady(true);
-  }, [draftKey, initialStay]);
+  }, [draftKey, urlStay]);
 
   useEffect(() => {
     if (!draftReady || success) return;

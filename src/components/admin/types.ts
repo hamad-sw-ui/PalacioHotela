@@ -15,7 +15,7 @@ export type AdminData = {
   notifications: AdminNotification[];
   activity: AdminActivity[];
   settings: HotelSettings;
-  integrations: { google: boolean; googleClientIdSet: boolean; googleClientSecretSet: boolean; card: boolean; paypal: boolean; cash: boolean; paypalRate: number | null; stripeRate: number; smtp: boolean; smtpPasswordSet: boolean; aiApi: boolean; aiApiKeySet: boolean; stripeSecretKeySet: boolean; stripeWebhookSecretSet: boolean; paypalClientIdSet: boolean; paypalClientSecretSet: boolean; demoLogin: boolean };
+  integrations: { google: boolean; googleClientIdSet: boolean; googleClientSecretSet: boolean; card: boolean; paypal: boolean; cash: boolean; paypalRate: number | null; stripeRate: number; smtp: boolean;   smtpPasswordSet: boolean; aiApi: boolean; aiApiKeySet: boolean; stripeSecretKeySet: boolean; stripeWebhookSecretSet: boolean; paypalClientIdSet: boolean; paypalClientSecretSet: boolean };
   stats: { bookings: number; pendingBookings: number; quotes: number; newQuotes: number; unread: number; messages: number };
 };
 export type Section = "overview" | "reservations" | "devis" | "catalogue" | "pages" | "utilisateurs" | "messages" | "notifications" | "activite" | "parametres";

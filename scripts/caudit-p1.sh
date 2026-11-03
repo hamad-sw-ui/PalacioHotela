@@ -1,0 +1,15 @@
+for db in palacio palacio_restore_test; do
+  echo "=== DB=$db ==="
+  echo "--- drizzle.__drizzle_migrations ---"
+  sudo -n -u postgres psql -d $db -tAc "select coalesce((select count(*) from drizzle.__drizzle_migrations), -1) as n"
+  echo "--- public.__drizzle_migrations ---"
+  sudo -n -u postgres psql -d $db -tAc "select coalesce((select count(*) from public.__drizzle_migrations), -1) as n"
+  echo "--- schemas ---"
+  sudo -n -u postgres psql -d $db -tAc "select nspname from pg_namespace where nspname not in ('pg_catalog','information_schema')"
+  echo "--- schemas having __drizzle_migrations ---"
+  sudo -n -u postgres psql -d $db -tAc "select table_schema||'.'||table_name from information_schema.tables where table_name like '%drizzle_migrations%'"
+done
+echo "=== CURRENT USER / SEARCH PATH ==="
+sudo -n -u postgres psql -d palacio -tAc "select current_user, current_database(), current_setting('search_path')"
+echo "=== HASH 0017 ==="
+sudo -n -u postgres psql -d palacio -tAc "select coalesce((select string_agg(hash||'@'||nspname, ', ') from drizzle.__drizzle_migrations, pg_namespace n where n.oid = t.oid), 'none') from (select 1) x" 2>/dev/null || echo "n/a"

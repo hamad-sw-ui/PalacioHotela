@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:quote": "node --import tsx --test scripts/quote-regression.test.ts scripts/quote-draft.test.ts",
+    "test:ai": "node --import tsx --test scripts/ai-chat.test.ts",
     "test:smtp": "node --import tsx --test scripts/smtp.test.ts",
     "test:payments": "node --import tsx --test scripts/payments.test.ts scripts/booking-refund.test.ts",
     "test:gallery": "node --import tsx --test scripts/catalog-gallery.test.ts",

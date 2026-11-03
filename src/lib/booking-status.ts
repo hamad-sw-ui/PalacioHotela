@@ -1,4 +1,5 @@
-export const HOTEL_TIME_ZONE = "Africa/Douala";
+import { DEFAULT_TIME_ZONE } from "@/lib/location-copy";
+export const HOTEL_TIME_ZONE = DEFAULT_TIME_ZONE;
 
 export type BookingStatus = "pending" | "confirmed" | "checked_in" | "checked_out" | "cancelled";
 

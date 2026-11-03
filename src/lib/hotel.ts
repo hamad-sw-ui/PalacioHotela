@@ -1,32 +1,46 @@
-import { and, eq, gt, inArray, lt, sql } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
+import { cache } from "react";
+import { and, eq, gt, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { db, pool } from "@/db";
 import { activityLogs, bookings, catalogItems, contentPages, notifications, quoteRequests, siteSettings, users, type CatalogItem, type ContentPage, type SelectedItem } from "@/db/schema";
 import { demandFits, demandRanges, occupiedPeak, quoteOccupiesStock, remainingFromStays, type Stay } from "@/lib/availability";
 import { reservedPageChangeBlocked, reservedPageMessage } from "@/lib/content-pages";
 import { ensureSeeded } from "@/lib/seed";
 import { daysBetween } from "@/lib/format";
+import { DEFAULT_ADDRESS_EN, DEFAULT_ADDRESS_FR, DEFAULT_HERO_SUBTITLE_EN, DEFAULT_HERO_SUBTITLE_FR, DEFAULT_TIME_ZONE, LOCATION_FALLBACKS } from "@/lib/location-copy";
 import { quoteLineTotal as sharedQuoteLineTotal } from "@/lib/quote-pricing";
 export { daysBetween, formatXaf, validDateRange } from "@/lib/format";
 
 export async function getSettings() {
+  await ensureSeeded();
+  const getCachedSettings = unstable_cache(
+    async () => {
+      const [settings] = await db.select().from(siteSettings).where(eq(siteSettings.id, 1));
+      return settings;
+    },
+    ["site-settings"],
+    { tags: ["settings"], revalidate: 60 },
+  );
   try {
-    await ensureSeeded();
-    const [settings] = await db.select().from(siteSettings).where(eq(siteSettings.id, 1));
-    return settings;
+    return await getCachedSettings();
   } catch (error) {
+    const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
     // Keep the public shell viewable during local UI work when PostgreSQL is not running.
-    // Mutating APIs still fail normally and production keeps the database as a requirement.
-    if (process.env.NODE_ENV !== "development") throw error;
-    console.warn("[Palacio] Database unavailable in development; using preview settings.");
+    // During the static prerender of `next build` (build machine without database access),
+    // the same safe fallbacks allow the build to complete; pages rendered at runtime keep
+    // the database as a requirement and fail loudly on outage.
+    if (process.env.NODE_ENV !== "development" && !isBuildPhase) throw error;
+    console.warn("[Palacio] Database unavailable; using preview settings (dev or build phase only).");
     return {
       id: 1, hotelName: "Palacio Hotel", logoUrl: "", secondaryLogoUrl: "", tertiaryLogoUrl: "", quoteLogoVariant: "primary", heroImage: "/images/palacio-hero.jpg",
       heroTitleFr: "Un séjour d’exception, à votre image.", heroTitleEn: "An exceptional stay, made for you.",
-      heroSubtitleFr: "Au cœur de Douala, découvrez une adresse où l’élégance rencontre la chaleur de l’hospitalité.",
-      heroSubtitleEn: "In the heart of Douala, discover a place where elegance meets the warmth of hospitality.",
+      heroSubtitleFr: DEFAULT_HERO_SUBTITLE_FR,
+      heroSubtitleEn: DEFAULT_HERO_SUBTITLE_EN,
       aboutFr: "Plus qu’un hôtel, une destination.", aboutEn: "More than a hotel, a destination.", aboutImage: "/images/palacio-dining.jpg",
       pageHeroImage: "", galleryImage2: "", galleryImage3: "", fallbackImage: "",
       theme: "forest", themeColors: null, email: "bonjour@palaciohotel.com", phone: "+237 6 99 00 00 00", whatsapp: "237699000000", instagramUrl: "", facebookUrl: "",
-      addressFr: "Bonanjo, Douala, Cameroun", addressEn: "Bonanjo, Douala, Cameroon", latitude: 4.0511, longitude: 9.7679,
+      addressFr: "Bastos, Yaoundé, Cameroun", addressEn: "Bastos, Yaoundé, Cameroon", latitude: 4.0511, longitude: 9.7679,
+      timeZone: DEFAULT_TIME_ZONE, cityFr: "Yaoundé", cityEn: "Yaounde", countryFr: "Cameroun", countryEn: "Cameroon", taglineFr: LOCATION_FALLBACKS.taglineFr, taglineEn: LOCATION_FALLBACKS.taglineEn, footerBaselineFr: LOCATION_FALLBACKS.footerBaselineFr, footerBaselineEn: LOCATION_FALLBACKS.footerBaselineEn,
       acceptingQuotes: true, aiProvider: "auto", aiBaseUrl: "", aiModel: "", aiApiKey: "", quoteSignatureUrl: "", quoteStampUrl: "", quoteHeaderImageUrl: "", quoteSignerName: "", quoteSignerRole: "", quoteTermsFr: "", quoteTermsEn: "", smtpHost: "", smtpPort: 587, smtpSecure: false, smtpRequireTls: true, smtpUser: "", smtpPassword: "", smtpFrom: "", stripeSecretKey: "", stripeWebhookSecret: "", paypalClientId: "", paypalClientSecret: "", paypalEnv: "sandbox", paypalXafPerEur: 655.957, googleClientId: "", googleClientSecret: "", updatedAt: new Date(),
     };
   }
@@ -41,15 +55,22 @@ const previewCatalog: CatalogItem[] = [
 ];
 
 const previewPages: ContentPage[] = [
-  { id: 1, slug: "notre-histoire", titleFr: "L’esprit Palacio", titleEn: "The Palacio spirit", bodyFr: "Bienvenue dans un lieu où l’hospitalité a le sens du détail.\n\nAu cœur de Douala, le Palacio Hotel vous accueille dans un écrin de sérénité.", bodyEn: "Welcome to a place where hospitality lives in the details.\n\nIn the heart of Douala, Palacio Hotel welcomes you into a haven of serenity.", image: "/images/palacio-hero.jpg", published: true, createdAt: new Date(), updatedAt: new Date() },
+  { id: 1, slug: "notre-histoire", titleFr: "L’esprit Palacio", titleEn: "The Palacio spirit", bodyFr: `Bienvenue dans un lieu où l’hospitalité a le sens du détail.\n\nAu cœur de ${LOCATION_FALLBACKS.cityFr}, le Palacio Hotel vous accueille dans un écrin de sérénité.`, bodyEn: `Welcome to a place where hospitality lives in the details.\n\nIn the heart of ${LOCATION_FALLBACKS.cityEn}, Palacio Hotel welcomes you into a haven of serenity.`, image: "/images/palacio-hero.jpg", published: true, createdAt: new Date(), updatedAt: new Date() },
   { id: 2, slug: "confidentialite", titleFr: "Politique de confidentialité", titleEn: "Privacy policy", bodyFr: "Vos données personnelles sont utilisées uniquement pour traiter vos demandes de réservation, de devis et vos messages.", bodyEn: "Your personal data is used only to process your booking requests, quote requests and messages.", image: "/images/palacio-hero.jpg", published: true, createdAt: new Date(), updatedAt: new Date() },
 ];
 
 export async function getPublicPage(slug: string) {
+  const cached = unstable_cache(
+    async () => {
+      await ensureSeeded();
+      const [page] = await db.select().from(contentPages).where(and(eq(contentPages.slug, slug), eq(contentPages.published, true))).limit(1);
+      return page;
+    },
+    ["content-page", slug],
+    { tags: ["pages", `page-${slug}`], revalidate: 60 },
+  );
   try {
-    await ensureSeeded();
-    const [page] = await db.select().from(contentPages).where(and(eq(contentPages.slug, slug), eq(contentPages.published, true))).limit(1);
-    return page;
+    return await cached();
   } catch (error) {
     if (process.env.NODE_ENV !== "development") throw error;
     return previewPages.find((page) => page.slug === slug);
@@ -57,12 +78,18 @@ export async function getPublicPage(slug: string) {
 }
 
 export async function getPublicCatalog() {
+  const cached = unstable_cache(
+    async () => await db.select().from(catalogItems).where(eq(catalogItems.active, true)).orderBy(catalogItems.id),
+    ["public-catalog"],
+    { tags: ["catalog"], revalidate: 60 },
+  );
   try {
     await ensureSeeded();
-    return await db.select().from(catalogItems).where(eq(catalogItems.active, true)).orderBy(catalogItems.id);
+    return await cached();
   } catch (error) {
-    if (process.env.NODE_ENV !== "development") throw error;
-    console.warn("[Palacio] Catalog unavailable in development preview; using preview catalog.");
+    const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+    if (process.env.NODE_ENV !== "development" && !isBuildPhase) throw error;
+    console.warn("[Palacio] Catalog unavailable; using preview catalog (dev or build phase only).");
     return previewCatalog;
   }
 }
@@ -79,7 +106,21 @@ export function quoteLineTotal(item: SelectedItem) {
 async function occupyingStays(itemId: number, start: string, end: string, options: { excludeBookingId?: number; excludeQuoteId?: number } = {}) {
   const today = new Date().toISOString().slice(0, 10);
   const reserved = await db.select({ id: bookings.id, checkIn: bookings.checkIn, checkOut: bookings.checkOut, quantity: bookings.quantity }).from(bookings).where(and(eq(bookings.itemId, itemId), lt(bookings.checkIn, end), gt(bookings.checkOut, start), inArray(bookings.status, ["pending", "confirmed", "checked_in"])));
-  const holds = await db.select({ id: quoteRequests.id, status: quoteRequests.status, checkIn: quoteRequests.checkIn, checkOut: quoteRequests.checkOut, validUntil: quoteRequests.validUntil, selectedItems: quoteRequests.selectedItems }).from(quoteRequests).where(inArray(quoteRequests.status, ["new", "in_review", "quote_sent", "negotiating", "accepted"]));
+  // Filter in SQL instead of loading every active quote with its JSON payload:
+  // quotes whose own stay window (or any explicit order date) cannot overlap the
+  // requested window are excluded by the database, and expired holds are skipped.
+  const holds = await db.select({ id: quoteRequests.id, status: quoteRequests.status, checkIn: quoteRequests.checkIn, checkOut: quoteRequests.checkOut, validUntil: quoteRequests.validUntil, selectedItems: quoteRequests.selectedItems }).from(quoteRequests).where(and(
+    inArray(quoteRequests.status, ["new", "in_review", "quote_sent", "negotiating", "accepted"]),
+    // The stay window (possibly null for order-date quotes) overlaps [start, end),
+    // or the quote carries explicit dates stored in the selectedItems JSON.
+    or(
+      and(lt(quoteRequests.checkIn, end), gt(quoteRequests.checkOut, start)),
+      isNull(quoteRequests.checkIn),
+      sql`${quoteRequests.selectedItems}::text LIKE '%"order_date"%'`,
+    ),
+    // Non-accepted quotes only hold stock until their validity date.
+    or(eq(quoteRequests.status, "accepted"), or(isNull(quoteRequests.validUntil), gte(quoteRequests.validUntil, today))),
+  ));
   const stays: Stay[] = reserved.filter((booking) => booking.id !== options.excludeBookingId).map((booking) => ({ start: booking.checkIn, end: booking.checkOut, quantity: booking.quantity }));
   for (const quote of holds) {
     if (quote.id === options.excludeQuoteId || !quoteOccupiesStock(quote.status)) continue;

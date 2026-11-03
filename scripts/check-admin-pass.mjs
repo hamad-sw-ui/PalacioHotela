@@ -1,0 +1,12 @@
+import { Pool } from "pg";
+import { scryptSync, randomBytes, timingSafeEqual } from "node:crypto";
+import { config } from "dotenv";
+config();
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const r = await pool.query("select id, email, password_hash from users where id = 1");
+const hash = r.rows[0].password_hash;
+const [algo, salt, h] = String(hash).split(":");
+console.log("algo:", algo, "hashLen:", h?.length);
+const computed = scryptSync("Palacio-2026", salt, 64);
+console.log("matches Palacio-2026:", timingSafeEqual(Buffer.from(h, "hex"), computed));
+await pool.end();

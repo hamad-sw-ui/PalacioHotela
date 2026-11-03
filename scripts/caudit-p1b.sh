@@ -1,0 +1,5 @@
+sudo -n -u postgres psql -d palacio -tAc "select conrelid::regclass::text, contype, pg_get_constraintdef(oid) from pg_constraint where connamespace='public'::regnamespace and contype in ('p','u') order by conrelid::regclass::text"
+echo "=== check constraints ==="
+sudo -n -u postgres psql -d palacio -tAc "select conrelid::regclass::text, pg_get_constraintdef(oid) from pg_constraint where connamespace='public'::regnamespace and contype='c'"
+echo "=== sequences ownership ==="
+sudo -n -u postgres psql -d palacio -tAc "select sequencename, last_value from pg_sequences where schemaname='public' order by sequencename"
