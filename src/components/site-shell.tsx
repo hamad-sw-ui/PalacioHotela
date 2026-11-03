@@ -15,6 +15,7 @@ import { WhatsAppMark } from "@/components/whatsapp-mark";
 import { FacebookMark, InstagramMark } from "@/components/social-marks";
 import { mergePalette, paletteIsCustom } from "@/lib/quote-pdf-theme";
 import { themeVariableStyle } from "@/lib/platform-colors";
+import { hotelFooterBaseline, hotelTagline } from "@/lib/location-copy";
 
 type Context = { locale: "fr" | "en"; setLocale: (locale: "fr" | "en") => void; settings: HotelSettings; member: boolean | null; setMember: (value: boolean) => void };
 const SiteContext = createContext<Context | null>(null);
@@ -110,8 +111,8 @@ function Header() {
       ? <Link href="/compte" className="btn btn-outline nav-login">{tr(locale, "Se connecter", "Sign in")}</Link>
       : <span className="nav-account-slot" aria-hidden="true"/>;
   return <header className="site-header">
-    <div className="topbar"><div className="container topbar-inner"><div className="topbar-left"><MapPin size={13} strokeWidth={1.8}/><span>{locale === "en" ? settings.addressEn : settings.addressFr}</span><span className="topbar-divider"/><span>{tr(locale, "Votre parenthèse d'exception à Douala", "Your exceptional escape in Douala")}</span></div><div className="topbar-right"><a href={hotelPhoneUrl(settings)}><Phone size={13}/>{settings.phone}</a><span className="topbar-divider"/><button onClick={() => setLocale(locale === "fr" ? "en" : "fr")} className="language-switch" aria-label={tr(locale, "Passer en anglais", "Switch to French")}>{locale.toUpperCase()} <span>⌄</span></button></div></div></div>
-    <div className="nav-wrap"><div className="container nav-inner"><Link href="/" aria-label="Palacio Hotel" className="brand-link"><Brand settings={settings}/></Link><nav className={`main-nav ${open ? "is-open" : ""}`} aria-label="Navigation principale">{links.map((link) => <Link key={link.match || link.href} href={link.href} className={activeLink(link.href, link.match) ? "nav-active" : ""}>{tr(locale, link.fr, link.en)}</Link>)}<div className="mobile-nav-extra"><Link href="/contact">{tr(locale, "Nous contacter", "Contact us")}</Link><Link href="/compte">{member === true ? tr(locale, "Mon compte", "My account") : tr(locale, "Se connecter", "Sign in")}</Link><button onClick={() => setLocale(locale === "fr" ? "en" : "fr")}>{locale === "fr" ? "English" : "Français"}</button></div></nav><div className="nav-actions">{accountAction}<Link href={memberHref(member === true, "/reservation")} className="btn btn-primary nav-book">{tr(locale, "Réserver", "Book now")} <ArrowRight size={15}/></Link><button type="button" className="mobile-menu-button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={open ? tr(locale, "Fermer le menu", "Close menu") : tr(locale, "Ouvrir le menu", "Open menu")}>{open ? <X size={24}/> : <Menu size={24}/>}</button></div></div></div>
+    <div className="topbar"><div className="container topbar-inner"><div className="topbar-left"><MapPin size={13} strokeWidth={1.8}/><span>{locale === "en" ? settings.addressEn : settings.addressFr}</span><span className="topbar-divider"/><span>{tr(locale, hotelTagline(settings, locale), hotelTagline(settings, "en"))}</span></div><div className="topbar-right"><a href={hotelPhoneUrl(settings)}><Phone size={13}/>{settings.phone}</a><span className="topbar-divider"/><button onClick={() => setLocale(locale === "fr" ? "en" : "fr")} className="language-switch" aria-label={tr(locale, "Passer en anglais", "Switch to French")}>{locale.toUpperCase()} <span>⌄</span></button></div></div></div>
+    <div className="nav-wrap"><div className="container nav-inner"><Link href="/" aria-label="Palacio Hotel" className="brand-link"><Brand settings={settings}/></Link><nav className={`main-nav ${open ? "is-open" : ""}`} aria-label="Navigation principale">{links.map((link) => <Link key={link.match || link.href} href={link.href} className={activeLink(link.href, link.match) ? "nav-active" : ""}>{tr(locale, link.fr, link.en)}</Link>)}<div className="mobile-nav-extra"><Link href="/contact">{tr(locale, "Nous contacter", "Contact us")}</Link><Link href="/compte">{member === true ? tr(locale, "Mon compte", "My account") : tr(locale, "Se connecter", "Sign in")}</Link><button onClick={() => setLocale(locale === "fr" ? "en" : "fr")}>{locale === "fr" ? "English" : "Français"}</button></div></nav><div className="nav-actions">{accountAction}<Link href="/reservation" className="btn btn-primary nav-book">{tr(locale, "Réserver", "Book now")} <ArrowRight size={15}/></Link><button type="button" className="mobile-menu-button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={open ? tr(locale, "Fermer le menu", "Close menu") : tr(locale, "Ouvrir le menu", "Open menu")}>{open ? <X size={24}/> : <Menu size={24}/>}</button></div></div></div>
   </header>;
 }
 
@@ -125,7 +126,7 @@ function Footer() {
         <div className="footer-top">
           <div className="footer-brand">
             <Link href="/"><Brand settings={settings} light/></Link>
-            <p>{tr(locale, "Une adresse singulière, des instants inoubliables. Bienvenue chez vous, à Douala.", "An extraordinary address, unforgettable moments. Welcome home in Douala.")}</p>
+            <p>{hotelFooterBaseline(settings, locale)}</p>
             <div className="footer-social">
               <a href={whatsappUrl(settings.whatsapp, tr(locale, "Bonjour Palacio Hotel, j'aimerais vous contacter.", "Hello Palacio Hotel, I would like to contact you."))} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp"><WhatsAppMark size={18}/></a>
               <a href={settings.instagramUrl || "https://instagram.com"} target="_blank" rel="noopener noreferrer" aria-label="Instagram"><InstagramMark size={17}/></a>
@@ -141,7 +142,7 @@ function Footer() {
           </div>
           <div className="footer-col">
             <h4>{tr(locale, "Votre séjour", "Your stay")}</h4>
-            <Link href={memberHref(member === true, "/reservation")}>{tr(locale, "Réserver un séjour", "Make a booking")}</Link>
+            <Link href="/reservation">{tr(locale, "Réserver un séjour", "Make a booking")}</Link>
             <Link href={memberHref(member === true, "/devis")}>{tr(locale, "Demander un devis", "Request a quote")}</Link>
             <Link href="/compte">{tr(locale, "Mon compte", "My account")}</Link>
             <Link href="/contact">{tr(locale, "Nous contacter", "Contact us")}</Link>
