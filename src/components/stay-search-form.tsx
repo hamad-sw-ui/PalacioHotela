@@ -36,7 +36,7 @@ export function StaySearchForm({ initial }: { initial?: { checkIn?: string; chec
   }
 
   return <>
-    <form className="search-panel" onSubmit={search}>
+    <form id="stay-search" className="search-panel" onSubmit={search}>
       <div className="search-heading"><span className="search-heading-icon"><CalendarDays size={21}/></span><div><span className="search-heading-small">{tr(locale, "ORGANISEZ VOTRE ESCAPADE", "PLAN YOUR GETAWAY")}</span><strong>{tr(locale, "Votre séjour commence ici", "Your stay starts here")}</strong></div></div>
       <label className="search-field"><span>{tr(locale, "ARRIVÉE", "CHECK IN")}</span><input type="date" required min={today} value={checkIn} onChange={(e) => { setError(""); setCheckIn(e.target.value); if (checkOut && checkOut <= e.target.value) setCheckOut(""); }}/></label>
       <label className="search-field"><span>{tr(locale, "DÉPART", "CHECK OUT")}</span><input type="date" required min={checkIn || today} value={checkOut} onChange={(e) => { setError(""); setCheckOut(e.target.value); }}/></label>

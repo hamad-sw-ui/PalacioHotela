@@ -1,5 +1,6 @@
 import { jsonb, boolean, date, doublePrecision, index, integer, pgTable, serial, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 import type { QuotePdfPalette } from "@/lib/quote-pdf-theme";
+import { DEFAULT_ADDRESS_EN, DEFAULT_ADDRESS_FR, DEFAULT_HERO_SUBTITLE_EN, DEFAULT_HERO_SUBTITLE_FR, DEFAULT_TIME_ZONE, LOCATION_FALLBACKS } from "@/lib/location-copy";
 
 export type SelectedItem = {
   property_id: number;
@@ -48,8 +49,8 @@ export const siteSettings = pgTable("site_settings", {
   heroImage: text("hero_image").notNull().default("/images/palacio-hero.jpg"),
   heroTitleFr: text("hero_title_fr").notNull().default("Un séjour d’exception, à votre image."),
   heroTitleEn: text("hero_title_en").notNull().default("An exceptional stay, made for you."),
-  heroSubtitleFr: text("hero_subtitle_fr").notNull().default("Au cœur de Douala, découvrez une adresse où l’élégance rencontre la chaleur de l’hospitalité."),
-  heroSubtitleEn: text("hero_subtitle_en").notNull().default("In the heart of Douala, discover a place where elegance meets the warmth of hospitality."),
+heroSubtitleFr: text("hero_subtitle_fr").notNull().default(DEFAULT_HERO_SUBTITLE_FR),
+heroSubtitleEn: text("hero_subtitle_en").notNull().default(DEFAULT_HERO_SUBTITLE_EN),
   aboutFr: text("about_fr").notNull().default("Plus qu’un hôtel, une destination. Chaque détail du Palacio est pensé pour faire de votre séjour un souvenir inoubliable."),
   aboutEn: text("about_en").notNull().default("More than a hotel, a destination. Every detail at Palacio is designed to make your stay unforgettable."),
   aboutImage: text("about_image").notNull().default("/images/palacio-dining.jpg"),
@@ -64,10 +65,19 @@ export const siteSettings = pgTable("site_settings", {
   whatsapp: varchar("whatsapp", { length: 60 }).notNull().default("237699000000"),
   instagramUrl: text("instagram_url").notNull().default(""),
   facebookUrl: text("facebook_url").notNull().default(""),
-  addressFr: text("address_fr").notNull().default("Bonanjo, Douala, Cameroun"),
-  addressEn: text("address_en").notNull().default("Bonanjo, Douala, Cameroon"),
+addressFr: text("address_fr").notNull().default(DEFAULT_ADDRESS_FR),
+addressEn: text("address_en").notNull().default(DEFAULT_ADDRESS_EN),
   latitude: doublePrecision("latitude").notNull().default(4.0511),
   longitude: doublePrecision("longitude").notNull().default(9.7679),
+timeZone: varchar("time_zone", { length: 64 }).notNull().default(DEFAULT_TIME_ZONE),
+cityFr: varchar("city_fr", { length: 120 }).notNull().default(LOCATION_FALLBACKS.cityFr),
+cityEn: varchar("city_en", { length: 120 }).notNull().default(LOCATION_FALLBACKS.cityEn),
+  countryFr: varchar("country_fr", { length: 120 }).notNull().default("Cameroun"),
+  countryEn: varchar("country_en", { length: 120 }).notNull().default("Cameroon"),
+taglineFr: varchar("tagline_fr", { length: 300 }).notNull().default(LOCATION_FALLBACKS.taglineFr),
+taglineEn: varchar("tagline_en", { length: 300 }).notNull().default(LOCATION_FALLBACKS.taglineEn),
+footerBaselineFr: text("footer_baseline_fr").notNull().default(LOCATION_FALLBACKS.footerBaselineFr),
+footerBaselineEn: text("footer_baseline_en").notNull().default(LOCATION_FALLBACKS.footerBaselineEn),
   acceptingQuotes: boolean("accepting_quotes").notNull().default(true),
   aiProvider: varchar("ai_provider", { length: 24 }).notNull().default("auto"),
   aiBaseUrl: text("ai_base_url").notNull().default(""),

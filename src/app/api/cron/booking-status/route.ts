@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { and, eq, inArray, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { bookings } from "@/db/schema";
-import { automaticBookingStatus, hotelLocalDate } from "@/lib/booking-status";
+import { automaticBookingStatus, hotelLocalDate, HOTEL_TIME_ZONE } from "@/lib/booking-status";
 import { getSettings, logActivity, notifyUser } from "@/lib/hotel";
 import { sendBookingStateEmails } from "@/lib/mail";
 
@@ -26,10 +26,11 @@ export async function GET(request: Request) {
   if (!authorized(request)) return Response.json({ error: "Unauthorized." }, { status: 401 });
 
   try {
-    const today = hotelLocalDate();
+    const settings = await getSettings();
+    const timeZone = settings?.timeZone || HOTEL_TIME_ZONE;
+    const today = hotelLocalDate(new Date(), timeZone);
     const candidates = await db.select().from(bookings)
       .where(and(inArray(bookings.status, ["confirmed", "checked_in"]), lte(bookings.checkIn, today)));
-    const settings = candidates.length ? await getSettings() : null;
     const origin = new URL(request.url).origin;
     const notices: Record<string, string> = {
       checked_in: "Votre séjour a commencé",
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
 
       updated += 1;
       const outcomes = await Promise.allSettled([
-        sendBookingStateEmails(record, settings!, nextStatus, origin),
+        sendBookingStateEmails(record, settings, nextStatus, origin),
         notifyUser(record.userId, "booking", notices[nextStatus], record.reference || "", `/reservation/confirmation?token=${record.publicToken}`),
         logActivity("automatic status bookings", "bookings", record.id, "Palacio", null, `${booking.status} → ${nextStatus}`),
       ]);

@@ -13,7 +13,7 @@ import { quoteInput } from "@/lib/validation";
 import { quoteVisibleToAccount } from "@/lib/quote-account";
 import { writeFile, mkdir, rm, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { demandFits, occupiedPeak, quoteOccupiesStock, remainingFromStays } from "@/lib/availability";
+import { demandFits, hasDemandWindow, occupiedPeak, quoteOccupiesStock, remainingFromStays } from "@/lib/availability";
 import { countryAccepted } from "@/lib/account-rules";
 import { replyAccepted, statusAfterOpen } from "@/lib/message-rules";
 import { bookingAdminHref, notificationMatchesRead } from "@/lib/notification-links";
@@ -82,17 +82,43 @@ test("local quote assistant turns natural language into catalog-backed lines", a
   const result = await analyzeQuoteMessage({
     provider: "local",
     locale: "fr",
-    message: "Nous sommes 18 personnes du 10 novembre au 12 novembre. Il nous faut 6 chambres, une salle de réunion, le déjeuner et le dîner.",
-    catalog: [catalog({ id: 1, category: "accommodation" }), catalog({ id: 2, category: "conference_room", nameFr: "Salon Acacia", nameEn: "Acacia Conference Room", slug: "salon-acacia", pricingUnit: "day", capacity: 60, price: 350000 }), catalog({ id: 3, category: "restaurant", nameFr: "La Table du Palacio", nameEn: "Palacio Dining", slug: "table-palacio", pricingUnit: "person", price: 32000 })],
+    message: "Nous sommes 18 personnes du 10 novembre au 12 novembre. Il nous faut 6 chambres, une salle de fête pour une célébration, le déjeuner et le dîner.",
+    catalog: [catalog({ id: 1, category: "accommodation" }), catalog({ id: 2, category: "event_hall", nameFr: "Salle des Étoiles", nameEn: "Starlight Event Hall", slug: "salle-des-etoiles", pricingUnit: "day", capacity: 180, price: 650000 }), catalog({ id: 3, category: "restaurant", nameFr: "La Table du Palacio", nameEn: "Palacio Dining", slug: "table-palacio", pricingUnit: "person", price: 32000 })],
   people: 18,
   checkIn: null,
   checkOut: null,
 });
   assert.equal(result.source, "local");
   assert.ok(result.lines.some((line) => line.category === "accommodation" && line.quantity === 6));
-  assert.ok(result.lines.some((line) => line.category === "conference_room"));
+  assert.ok(result.lines.some((line) => line.category === "event_hall"));
   assert.ok(result.lines.some((line) => line.category === "restaurant" && line.mealTypes?.includes("lunch") && line.mealTypes.includes("dinner")));
   assert.ok(result.lines.every((line) => line.catalogItemId));
+});
+
+test("AI quote context distinguishes total catalog inventory from live availability", async () => {
+  const originalFetch = globalThis.fetch;
+  let payload: { messages?: { role: string; content: string }[] } | undefined;
+  globalThis.fetch = async (_input, init) => {
+    payload = JSON.parse(String(init?.body)) as typeof payload;
+    return new Response(JSON.stringify({ message: { content: JSON.stringify({ lines: [], questions: [], warnings: [], confidence: 1 }) } }), { status: 200 });
+  };
+  try {
+    const result = await analyzeQuoteMessage({
+      provider: "ollama",
+      baseUrl: "http://127.0.0.1:11434",
+      model: "test",
+      locale: "fr",
+      message: "Je souhaite une chambre pour deux personnes.",
+      catalog: [catalog({ inventory: 8 })],
+    });
+    assert.equal(result.source, "ai");
+    const system = payload?.messages?.find((message) => message.role === "system")?.content || "";
+    assert.match(system, /"totalInventoryUnits":8/);
+    assert.match(system, /not live or date-specific availability/);
+    assert.match(system, /Final stock validation happens on the server/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("assistant table assembly maps a messy Gemini payload onto priced catalog lines", () => {
@@ -241,6 +267,12 @@ test("availability follows the busiest day and frees the checkout day", () => {
   assert.equal(remainingFromStays(8, "2027-06-01", "2027-06-20", separateNights), 7);
   assert.equal(remainingFromStays(1, "2027-06-03", "2027-06-05", [{ start: "2027-06-01", end: "2027-06-03", quantity: 1 }]), 1);
   assert.equal(remainingFromStays(1, "2027-06-01", "2027-06-06", [{ start: "2027-06-01", end: "2027-06-03", quantity: 1 }, { start: "2027-06-03", end: "2027-06-05", quantity: 1 }]), 0);
+});
+
+test("stock validation requires a date window but supports explicit order dates", () => {
+  assert.equal(hasDemandWindow({}), false);
+  assert.equal(hasDemandWindow({}, { start: "2027-06-10", end: "2027-06-12" }), true);
+  assert.equal(hasDemandWindow({ order_dates: ["2027-06-10"] }), true);
 });
 
 test("hotel coordinates stay exact while typing and appear on the homepage", () => {

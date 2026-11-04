@@ -1,9 +1,10 @@
 import { randomBytes } from "node:crypto";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { bookings, catalogItems, contactMessages, contentPages, notifications, quoteRequests, siteSettings, users } from "@/db/schema";
+import { hasDemandWindow, demandRanges, quoteOccupiesStock } from "@/lib/availability";
 import { getAdminForMutation, hashPassword } from "@/lib/auth";
 import { countryAccepted } from "@/lib/account-rules";
 import { replyAccepted } from "@/lib/message-rules";
@@ -33,17 +34,18 @@ const quoteDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const quoteMeal = z.enum(["breakfast", "lunch", "dinner", "snacks", "other"]);
 const catalogSchema = z.object({ slug: z.string().min(2).max(200).regex(/^[a-z0-9-]+$/), category: z.enum(["accommodation", "conference_room", "event_hall", "service", "restaurant"]), nameFr: z.string().min(2).max(200), nameEn: z.string().min(2).max(200), descriptionFr: z.string().max(4000), descriptionEn: z.string().max(4000), image, images: z.array(image).max(8).default([]), price: z.coerce.number().int().min(0).max(1000000000), pricingUnit: z.enum(["night", "day", "person", "service"]), capacity: z.coerce.number().int().min(1).max(10000), inventory: z.coerce.number().int().min(0).max(10000), amenitiesFr: z.array(z.string().max(100)).max(30), amenitiesEn: z.array(z.string().max(100)).max(30), features: z.array(z.object({ labelFr: z.string().max(40), labelEn: z.string().max(40), value: z.string().max(24) })).max(12).default([]), featured: z.boolean(), active: z.boolean() }).strict();
 const pageSchema = z.object({ slug: z.string().min(2).max(160).regex(/^[a-z0-9-]+$/), titleFr: z.string().min(2).max(200), titleEn: z.string().min(2).max(200), bodyFr: z.string().max(30000), bodyEn: z.string().max(30000), image, published: z.boolean() }).strict();
-const settingsSchema = z.object({ hotelName: z.string().min(2).max(180), logoUrl: image, secondaryLogoUrl: image, tertiaryLogoUrl: image, quoteLogoVariant: z.enum(["primary", "secondary", "tertiary"]), heroImage: image, heroTitleFr: z.string().min(3).max(300), heroTitleEn: z.string().min(3).max(300), heroSubtitleFr: z.string().max(1000), heroSubtitleEn: z.string().max(1000), aboutFr: z.string().max(5000), aboutEn: z.string().max(5000), aboutImage: image, pageHeroImage: image, galleryImage2: image, galleryImage3: image, fallbackImage: image, theme: z.enum(["forest", "midnight", "terracotta"]), themeColors: z.record(z.string(), z.string()).nullable(), email: z.email(), phone: z.string().min(6).max(60), whatsapp: z.string().min(8).max(60), instagramUrl: z.string().max(500).refine((value) => !value || value.startsWith("https://"), "Le lien Instagram doit commencer par https://"), facebookUrl: z.string().max(500).refine((value) => !value || value.startsWith("https://"), "Le lien Facebook doit commencer par https://"), addressFr: z.string().max(500), addressEn: z.string().max(500), latitude: z.union([z.number(), z.string()]).refine((value) => coordinateValue(value, -90, 90) !== null, "La latitude doit être comprise entre −90 et 90.").transform((value) => coordinateValue(value, -90, 90)!), longitude: z.union([z.number(), z.string()]).refine((value) => coordinateValue(value, -180, 180) !== null, "La longitude doit être comprise entre −180 et 180.").transform((value) => coordinateValue(value, -180, 180)!), acceptingQuotes: z.boolean(), aiProvider: z.enum(["auto", "openai", "ollama", "local", "gemini"]), aiBaseUrl: z.string().max(500), aiModel: z.string().max(120), aiApiKey: z.string().max(300).optional(), stripeSecretKey: z.string().max(500).optional(), stripeWebhookSecret: z.string().max(500).optional(), paypalClientId: z.string().max(300).optional(), paypalClientSecret: z.string().max(500).optional(), paypalEnv: z.enum(["sandbox", "live"]).optional(), paypalXafPerEur: z.coerce.number().min(0).max(10000).optional(), googleClientId: z.string().max(300).optional(), googleClientSecret: z.string().max(500).optional(), quoteSignatureUrl: image, quoteStampUrl: image, quoteHeaderImageUrl: image, quoteSignerName: z.string().max(180), quoteSignerRole: z.string().max(180), quoteTermsFr: z.string().max(10000), quoteTermsEn: z.string().max(10000), smtpHost: z.string().max(255), smtpPort: z.coerce.number().int().min(1).max(65535), smtpSecure: z.boolean(), smtpRequireTls: z.boolean(), smtpUser: z.string().max(255), smtpPassword: z.string().max(500).optional(), smtpFrom: z.string().max(500) }).strict();
+const settingsSchema = z.object({ hotelName: z.string().min(2).max(180), logoUrl: image, secondaryLogoUrl: image, tertiaryLogoUrl: image, quoteLogoVariant: z.enum(["primary", "secondary", "tertiary"]), heroImage: image, heroTitleFr: z.string().min(3).max(300), heroTitleEn: z.string().min(3).max(300), heroSubtitleFr: z.string().max(1000), heroSubtitleEn: z.string().max(1000), aboutFr: z.string().max(5000), aboutEn: z.string().max(5000), aboutImage: image, pageHeroImage: image, galleryImage2: image, galleryImage3: image, fallbackImage: image, theme: z.enum(["forest", "midnight", "terracotta"]), themeColors: z.record(z.string(), z.string()).nullable(), email: z.email(), phone: z.string().min(6).max(60), whatsapp: z.string().min(8).max(60), instagramUrl: z.string().max(500).refine((value) => !value || value.startsWith("https://"), "Le lien Instagram doit commencer par https://"), facebookUrl: z.string().max(500).refine((value) => !value || value.startsWith("https://"), "Le lien Facebook doit commencer par https://"), addressFr: z.string().max(500), addressEn: z.string().max(500), timeZone: z.string().max(64).refine((value) => { try { new Intl.DateTimeFormat("en-CA", { timeZone: value }); return true; } catch { return false; } }, "Fuseau horaire invalide"), cityFr: z.string().max(120), cityEn: z.string().max(120), countryFr: z.string().max(120), countryEn: z.string().max(120), taglineFr: z.string().max(300), taglineEn: z.string().max(300), footerBaselineFr: z.string().max(1000), footerBaselineEn: z.string().max(1000), latitude: z.union([z.number(), z.string()]).refine((value) => coordinateValue(value, -90, 90) !== null, "La latitude doit être comprise entre −90 et 90.").transform((value) => coordinateValue(value, -90, 90)!), longitude: z.union([z.number(), z.string()]).refine((value) => coordinateValue(value, -180, 180) !== null, "La longitude doit être comprise entre −180 et 180.").transform((value) => coordinateValue(value, -180, 180)!), acceptingQuotes: z.boolean(), aiProvider: z.enum(["auto", "openai", "ollama", "local", "gemini"]), aiBaseUrl: z.string().max(500), aiModel: z.string().max(120), aiApiKey: z.string().max(300).optional(), stripeSecretKey: z.string().max(500).optional(), stripeWebhookSecret: z.string().max(500).optional(), paypalClientId: z.string().max(300).optional(), paypalClientSecret: z.string().max(500).optional(), paypalEnv: z.enum(["sandbox", "live"]).optional(), paypalXafPerEur: z.coerce.number().min(0).max(10000).optional(), googleClientId: z.string().max(300).optional(), googleClientSecret: z.string().max(500).optional(), quoteSignatureUrl: image, quoteStampUrl: image, quoteHeaderImageUrl: image, quoteSignerName: z.string().max(180), quoteSignerRole: z.string().max(180), quoteTermsFr: z.string().max(10000), quoteTermsEn: z.string().max(10000), smtpHost: z.string().max(255), smtpPort: z.coerce.number().int().min(1).max(65535), smtpSecure: z.boolean(), smtpRequireTls: z.boolean(), smtpUser: z.string().max(255), smtpPassword: z.string().max(500).optional(), smtpFrom: z.string().max(500) }).strict();
 const userSchema = z.object({ fullName: z.string().trim().min(2).max(180), email: z.email().transform((v) => v.toLowerCase()), country: z.string().trim().max(120).refine(countryAccepted, "Le pays doit contenir au moins 2 caractères.").optional(), phone: z.string().max(60).nullable(), role: z.enum(["admin", "staff", "guest"]), locale: z.enum(["fr", "en"]), active: z.boolean(), password: z.string().min(8).max(200).optional() }).strict();
 const quoteSchema = z.object({ guestName: z.string().min(2).max(180), guestEmail: z.email(), guestPhone: z.string().min(6).max(60), company: z.string().max(180).nullable(), locale: z.enum(["fr", "en"]), requestKind: z.enum(["accommodation", "conference_room", "event_hall", "service", "restaurant", "mixed"]), checkIn: quoteDate.nullable(), checkOut: quoteDate.nullable(), people: z.coerce.number().int().min(1).max(10000), message: z.string().max(4000), budget: z.coerce.number().int().min(0).nullable(), estimatedTotal: z.coerce.number().int().min(0).nullable().optional(), amountTtc: z.coerce.number().int().min(0).nullable(), validUntil: quoteDate.nullable(), status: z.enum(["new", "in_review", "quote_sent", "negotiating", "accepted", "rejected", "expired", "cancelled"]), adminNotes: z.string().max(4000), selectedItems: z.array(z.object({ property_id: z.coerce.number().int().positive(), type: z.enum(["accommodation", "conference_room", "event_hall", "service", "restaurant"]), name_fr: z.string().max(200), name_en: z.string().max(200), description_fr: z.string().max(4000).optional(), description_en: z.string().max(4000).optional(), image: z.string().max(2000).optional(), price: z.coerce.number().int().min(0), quantity: z.coerce.number().int().min(1), nights: z.coerce.number().int().min(1).optional(), check_in: quoteDate.optional(), check_out: quoteDate.optional(), dates: z.array(quoteDate).max(30).optional(), order_date: quoteDate.optional(), order_dates: z.array(quoteDate).max(30).optional(), order_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(), meal_types: z.array(quoteMeal).max(5).optional(), parent_id: z.coerce.number().int().positive().optional(), parent_item_name: z.string().max(200).optional(), source: z.string().optional() }).passthrough()).max(30) }).strict();
 const bookingSchema = z.object({ guestName: z.string().min(2).max(180), guestEmail: z.email(), guestPhone: z.string().min(6).max(60), locale: z.enum(["fr", "en"]), itemId: z.coerce.number().int().positive(), checkIn: z.string(), checkOut: z.string(), guests: z.coerce.number().int().min(1).max(10000), quantity: z.coerce.number().int().min(1).max(100), notes: z.string().max(4000), status: z.enum(["pending", "confirmed", "checked_in", "checked_out", "cancelled"]), paymentStatus: z.enum(["unpaid", "awaiting_payment", "pay_on_site", "paid", "refunded"]), paymentMethod: z.enum(["cash", "card", "paypal"]) }).strict();
 
 async function manageCatalog(action: string, id: number, data: Record<string, unknown>) {
-  if (action === "delete") { await assertCatalogCanBeRemoved([id]); await db.delete(catalogItems).where(eq(catalogItems.id, id)); return {}; }
+  const finish = <T,>(value: T) => { revalidateTag("catalog", { expire: 0 }); return value; };
+  if (action === "delete") { await assertCatalogCanBeRemoved([id]); await db.delete(catalogItems).where(eq(catalogItems.id, id)); return finish({}); }
   if (action === "create") {
     const parsed = catalogSchema.parse({ descriptionFr: "", descriptionEn: "", image: "", price: 0, pricingUnit: "night", capacity: 2, inventory: 1, amenitiesFr: [], amenitiesEn: [], featured: false, active: true, ...data, features: featuresForNewItem(String(data.category || "accommodation"), data.features) });
     await assertCatalogSlugAvailable(parsed.slug);
-    const [record] = await db.insert(catalogItems).values({ ...parsed, ...alignCatalogGallery(parsed.image, parsed.images) }).returning(); return record;
+    const [record] = await db.insert(catalogItems).values({ ...parsed, ...alignCatalogGallery(parsed.image, parsed.images) }).returning(); return finish(record);
   }
   const parsed = catalogSchema.partial().parse({ ...data, ...(data.features !== undefined ? { features: normalizeCatalogFeatures(data.features) } : {}) });
   const gallery = parsed.image !== undefined && parsed.images !== undefined ? alignCatalogGallery(parsed.image, parsed.images) : parsed.image !== undefined ? { image: alignCatalogGallery(parsed.image, []).image } : parsed.images !== undefined ? { images: extraPhotos(parsed.images) } : {};
@@ -54,22 +56,23 @@ async function manageCatalog(action: string, id: number, data: Record<string, un
   }
   const [record] = await db.update(catalogItems).set({ ...parsed, ...gallery, updatedAt: new Date() }).where(eq(catalogItems.id, id)).returning();
   if (!record) throw new Error("Élément introuvable.");
-  return record;
+  return finish(record);
 }
 
 async function managePages(action: string, id: number, data: Record<string, unknown>) {
-  if (action === "delete") { await assertReservedPagesStay([id], { remove: true }); await db.delete(contentPages).where(eq(contentPages.id, id)); return {}; }
+  const finish = <T,>(value: T) => { revalidateTag("pages", { expire: 0 }); return value; };
+  if (action === "delete") { await assertReservedPagesStay([id], { remove: true }); await db.delete(contentPages).where(eq(contentPages.id, id)); return finish({}); }
   if (action === "create") {
     const parsed = pageSchema.parse({ bodyFr: "", bodyEn: "", image: "", published: true, ...data });
     await assertPageSlugAvailable(parsed.slug);
     const [record] = await db.insert(contentPages).values(parsed).returning();
-    return record;
+    return finish(record);
   }
   const parsed = pageSchema.partial().parse(data);
   if (parsed.slug) await assertPageSlugAvailable(parsed.slug, id);
   await assertReservedPagesStay([id], { slug: parsed.slug, published: parsed.published });
   const [record] = await db.update(contentPages).set({ ...parsed, updatedAt: new Date() }).where(eq(contentPages.id, id)).returning();
-  if (!record) throw new Error("Page introuvable."); return record;
+  if (!record) throw new Error("Page introuvable."); return finish(record);
 }
 
 async function manageUsers(action: string, id: number, data: Record<string, unknown>, adminId: number) {
@@ -235,13 +238,13 @@ async function manageBulk(resource: string, data: Record<string, unknown>, admin
     if (operation === "delete") { const rows = await db.delete(quoteRequests).where(inArray(quoteRequests.id, ids)).returning({ id: quoteRequests.id }); return { count: rows.length }; }
   }
   if (resource === "catalog") {
-    if (operation === "set_active") { const rows = await db.update(catalogItems).set({ active: boolValue(), updatedAt: new Date() }).where(inArray(catalogItems.id, ids)).returning({ id: catalogItems.id }); return { count: rows.length }; }
-    if (operation === "set_featured") { const rows = await db.update(catalogItems).set({ featured: boolValue(), updatedAt: new Date() }).where(inArray(catalogItems.id, ids)).returning({ id: catalogItems.id }); return { count: rows.length }; }
-    if (operation === "delete") { await assertCatalogCanBeRemoved(ids); const rows = await db.delete(catalogItems).where(inArray(catalogItems.id, ids)).returning({ id: catalogItems.id }); return { count: rows.length }; }
+    if (operation === "set_active") { const rows = await db.update(catalogItems).set({ active: boolValue(), updatedAt: new Date() }).where(inArray(catalogItems.id, ids)).returning({ id: catalogItems.id }); revalidateTag("catalog", { expire: 0 }); return { count: rows.length }; }
+    if (operation === "set_featured") { const rows = await db.update(catalogItems).set({ featured: boolValue(), updatedAt: new Date() }).where(inArray(catalogItems.id, ids)).returning({ id: catalogItems.id }); revalidateTag("catalog", { expire: 0 }); return { count: rows.length }; }
+    if (operation === "delete") { await assertCatalogCanBeRemoved(ids); const rows = await db.delete(catalogItems).where(inArray(catalogItems.id, ids)).returning({ id: catalogItems.id }); revalidateTag("catalog", { expire: 0 }); return { count: rows.length }; }
   }
   if (resource === "pages") {
-    if (operation === "set_published") { const published = boolValue(); if (!published) await assertReservedPagesStay(ids, { published: false }); const rows = await db.update(contentPages).set({ published, updatedAt: new Date() }).where(inArray(contentPages.id, ids)).returning({ id: contentPages.id }); return { count: rows.length }; }
-    if (operation === "delete") { await assertReservedPagesStay(ids, { remove: true }); const rows = await db.delete(contentPages).where(inArray(contentPages.id, ids)).returning({ id: contentPages.id }); return { count: rows.length }; }
+    if (operation === "set_published") { const published = boolValue(); if (!published) await assertReservedPagesStay(ids, { published: false }); const rows = await db.update(contentPages).set({ published, updatedAt: new Date() }).where(inArray(contentPages.id, ids)).returning({ id: contentPages.id }); revalidateTag("pages", { expire: 0 }); return { count: rows.length }; }
+    if (operation === "delete") { await assertReservedPagesStay(ids, { remove: true }); const rows = await db.delete(contentPages).where(inArray(contentPages.id, ids)).returning({ id: contentPages.id }); revalidateTag("pages", { expire: 0 }); return { count: rows.length }; }
   }
   if (resource === "users") {
     if (operation === "set_active") { if (ids.includes(adminId) && !boolValue()) throw new Error("Vous ne pouvez pas désactiver votre propre compte."); const rows = await db.update(users).set({ active: boolValue() }).where(inArray(users.id, ids)).returning({ id: users.id }); return { count: rows.length }; }
@@ -308,13 +311,19 @@ async function manageQuotes(action: string, id: number, data: Record<string, unk
     }
     const linkedUserId = current.userId || await findActiveUserIdByEmail(current.guestEmail);
     const record = await withCatalogLocks([...sendGroups.keys()], async () => {
+      const undatedLine = current.selectedItems.find((line) => !hasDemandWindow(line, { start: current.checkIn, end: current.checkOut }));
+      if (undatedLine) throw new Error(`Impossible d’envoyer le devis : ajoutez une date ou une période pour « ${undatedLine.name_fr} » afin de vérifier le stock.`);
       for (const [itemId, lines] of sendGroups) {
         const [item] = await db.select().from(catalogItems).where(eq(catalogItems.id, itemId)).limit(1);
-        if (!item) continue;
+        if (!item) throw new Error("Une prestation de ce devis n’existe plus dans le catalogue.");
+        if (lines.some((line) => demandRanges(line, { start: current.checkIn, end: current.checkOut }).some((range) => !validDateRange(range.start, range.end)))) {
+          throw new Error(`Les dates de « ${lines[0]?.name_fr || item.nameFr} » doivent être futures et valides.`);
+        }
         const blocked = await demandConflict(item, lines, { start: current.checkIn, end: current.checkOut }, { excludeQuoteId: current.id });
         if (blocked) throw new Error(`${lines[0]?.name_fr || blocked.nameFr} n'est plus disponible à ces dates.`);
       }
-      const [row] = await db.update(quoteRequests).set({ userId: linkedUserId, amountTtc, validUntil, adminNotes, status: "quote_sent", adminSignatureUrl: signatureUrl || null, adminSignerName: signerName || null, adminSignerRole: settings.quoteSignerRole || null, adminSignedAt: signatureUrl ? new Date() : null, adminStampUrl: settings.quoteStampUrl || null, headerImageUrl: settings.quoteHeaderImageUrl || "", logoSnapshot: quoteLogoUrl(settings), tertiaryLogoSnapshot: settings.tertiaryLogoUrl || "", themeSnapshot: settings.theme || "forest", themePaletteSnapshot: mergePalette(settings.theme, settings.themeColors), termsSnapshotFr: settings.quoteTermsFr, termsSnapshotEn: settings.quoteTermsEn, pdfTemplateVersion: current.pdfTemplateVersion, updatedAt: new Date() }).where(eq(quoteRequests.id, id)).returning();
+      const [row] = await db.update(quoteRequests).set({ userId: linkedUserId, amountTtc, validUntil, adminNotes, status: "quote_sent", adminSignatureUrl: signatureUrl || null, adminSignerName: signerName || null, adminSignerRole: settings.quoteSignerRole || null, adminSignedAt: signatureUrl ? new Date() : null, adminStampUrl: settings.quoteStampUrl || null, headerImageUrl: settings.quoteHeaderImageUrl || "", logoSnapshot: quoteLogoUrl(settings), tertiaryLogoSnapshot: settings.tertiaryLogoUrl || "", themeSnapshot: settings.theme || "forest", themePaletteSnapshot: mergePalette(settings.theme, settings.themeColors), termsSnapshotFr: settings.quoteTermsFr, termsSnapshotEn: settings.quoteTermsEn, pdfTemplateVersion: current.pdfTemplateVersion, updatedAt: new Date() }).where(and(eq(quoteRequests.id, id), eq(quoteRequests.status, current.status), eq(quoteRequests.updatedAt, current.updatedAt))).returning();
+      if (!row) throw new Error("Ce devis a été modifié entre-temps. Actualisez la page puis réessayez.");
       return row;
     });
     const pdf = await buildQuotePdf(record, settings, "quote");
@@ -336,7 +345,8 @@ async function manageQuotes(action: string, id: number, data: Record<string, unk
     updateData.selectedItems = selectedItems;
     updateData.estimatedTotal = quoteTotal(selectedItems);
   }
-  if (current.clientSignatureUrl && (parsed.selectedItems || parsed.amountTtc !== undefined || parsed.validUntil !== undefined || parsed.adminNotes !== undefined)) {
+  const quoteTermsChanged = Boolean(parsed.selectedItems || parsed.checkIn !== undefined || parsed.checkOut !== undefined || parsed.amountTtc !== undefined || parsed.validUntil !== undefined || parsed.adminNotes !== undefined);
+  if (quoteTermsChanged) {
     updateData.clientSignatureUrl = null;
     updateData.clientSignerName = null;
     updateData.clientSignedAt = null;
@@ -344,7 +354,41 @@ async function manageQuotes(action: string, id: number, data: Record<string, unk
     updateData.clientAcceptanceUserAgent = null;
     if (current.status === "accepted") updateData.status = "negotiating";
   }
-  const [record] = await db.update(quoteRequests).set(updateData).where(eq(quoteRequests.id, id)).returning();
+  const selectedItems = (updateData.selectedItems as typeof current.selectedItems | undefined) || current.selectedItems;
+  const checkIn = parsed.checkIn === undefined ? current.checkIn : parsed.checkIn;
+  const checkOut = parsed.checkOut === undefined ? current.checkOut : parsed.checkOut;
+  const nextStatus = typeof updateData.status === "string" ? updateData.status : current.status;
+  const validateStock = quoteTermsChanged || nextStatus === "accepted";
+  const updateQuote = async () => {
+    if (validateStock && quoteOccupiesStock(nextStatus)) {
+      const groups = new Map<number, typeof selectedItems>();
+      for (const line of selectedItems) {
+        const lines = groups.get(line.property_id) || [];
+        lines.push(line);
+        groups.set(line.property_id, lines);
+      }
+      if (["quote_sent", "negotiating", "accepted"].includes(nextStatus)) {
+        const undatedLine = selectedItems.find((line) => !hasDemandWindow(line, { start: checkIn, end: checkOut }));
+        if (undatedLine) throw new Error(`Impossible de confirmer ce devis : ajoutez une date ou une période pour « ${undatedLine.name_fr} » afin de vérifier le stock.`);
+      }
+      for (const [itemId, lines] of groups) {
+        const [item] = await db.select().from(catalogItems).where(eq(catalogItems.id, itemId)).limit(1);
+        if (!item) throw new Error("Une prestation de ce devis n’existe plus dans le catalogue.");
+        const ranges = lines.flatMap((line) => demandRanges(line, { start: checkIn, end: checkOut }));
+        if (ranges.some((range) => !validDateRange(range.start, range.end))) {
+          throw new Error(`Les dates de « ${lines[0]?.name_fr || item.nameFr} » doivent être futures et valides.`);
+        }
+        const blocked = await demandConflict(item, lines, { start: checkIn, end: checkOut }, { excludeQuoteId: current.id });
+        if (blocked) throw new Error(`${lines[0]?.name_fr || blocked.nameFr} n'est plus disponible à ces dates.`);
+      }
+    }
+    const [record] = await db.update(quoteRequests).set(updateData).where(and(eq(quoteRequests.id, id), eq(quoteRequests.status, current.status), eq(quoteRequests.updatedAt, current.updatedAt))).returning();
+    if (!record) throw new Error("Ce devis a été modifié entre-temps. Actualisez la page puis réessayez.");
+    return record;
+  };
+  const record = validateStock
+    ? await withCatalogLocks(selectedItems.map((line) => line.property_id), updateQuote)
+    : await updateQuote();
   if (parsed.status && parsed.status !== current.status && ["in_review", "accepted", "rejected", "negotiating", "expired"].includes(parsed.status)) {
     await sendQuoteStateEmails(record, await getSettings(), parsed.status, undefined, origin);
     const titles: Record<string, string> = { in_review: "Votre demande de devis est à l’étude", accepted: "Votre devis a été accepté", rejected: "Votre devis a été refusé", negotiating: "Votre devis est en discussion", expired: "Votre devis a expiré" };
@@ -375,6 +419,9 @@ export async function POST(request: Request) {
     else if (resource === "quotes" && ["create", "update", "delete", "send"].includes(action)) result = await manageQuotes(action, id, data, new URL(request.url).origin);
     else if (resource === "settings" && action === "update") {
       const parsed = settingsSchema.partial().parse(data);
+      // Never allow an accidental 0/0 (Null Island) pair: an emptied GPS field
+      // used to be coerced to 0 client-side and silently moved the public map.
+      if ((parsed.latitude !== undefined || parsed.longitude !== undefined) && parsed.latitude === 0 && parsed.longitude === 0) throw new Error("Coordonnées GPS invalides : indiquez la position réelle de l’hôtel.");
       const submittedGoogleId = parsed.googleClientId?.trim();
       if (submittedGoogleId && !isValidGoogleClientId(submittedGoogleId)) {
         const [current] = await db.select({ googleClientId: siteSettings.googleClientId }).from(siteSettings).where(eq(siteSettings.id, 1));
@@ -414,6 +461,8 @@ export async function POST(request: Request) {
       const [settings] = await db.update(siteSettings).set({ ...settingsFields, ...(smtpPassword ? { smtpPassword } : {}), ...(storedAiKey ? { aiApiKey: storedAiKey } : {}), ...(storedStripeKey ? { stripeSecretKey: storedStripeKey } : {}), ...(storedWebhook ? { stripeWebhookSecret: storedWebhook } : {}), ...(storedPaypalId ? { paypalClientId: storedPaypalId } : {}), ...(storedPaypalSecret ? { paypalClientSecret: storedPaypalSecret } : {}), ...(storedGoogleId ? { googleClientId: storedGoogleId } : {}), ...(storedGoogleSecret ? { googleClientSecret: storedGoogleSecret } : {}), ...(themeColors !== undefined ? { themeColors } : {}), updatedAt: new Date() }).where(eq(siteSettings.id, 1)).returning();
       if (!settings) throw new Error("Paramètres introuvables.");
       revalidatePath("/", "layout");
+      revalidateTag("settings", { expire: 0 });
+      revalidateTag("pages", { expire: 0 });
       result = settingsForBrowser(settings);
     } else if (resource === "messages") {
       if (action === "delete") { await db.delete(contactMessages).where(eq(contactMessages.id, id)); result = {}; }

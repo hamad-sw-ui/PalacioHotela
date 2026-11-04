@@ -26,3 +26,12 @@ test("pending, cancelled, completed, and invalid-date reservations are not advan
   assert.equal(automaticBookingStatus("confirmed", "2026-02-30", "2026-03-02", "2026-03-01"), null);
   assert.equal(automaticBookingStatus("confirmed", "2026-10-12", "2026-10-11", "2026-10-12"), null);
 });
+
+test("the hotel date follows a configured time zone without touching the default", () => {
+  const instant = new Date("2026-06-15T22:30:00.000Z");
+  // Africa/Douala (UTC+1) is already the next day at 23:30.
+  assert.equal(hotelLocalDate(instant, "Africa/Douala"), "2026-06-15");
+  // Paris in summer (UTC+2) crosses midnight one hour earlier.
+  assert.equal(hotelLocalDate(instant, "Europe/Paris"), "2026-06-16");
+  assert.equal(hotelLocalDate(instant, "UTC"), "2026-06-15");
+});

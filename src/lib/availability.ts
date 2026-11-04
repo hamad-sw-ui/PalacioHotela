@@ -61,3 +61,7 @@ export function demandRanges(line: { order_dates?: string[]; order_date?: string
   if (start && end && start < end) return [{ start, end }];
   return [];
 }
+
+export function hasDemandWindow(line: Parameters<typeof demandRanges>[0], fallback?: { start?: string | null; end?: string | null }) {
+  return demandRanges(line, fallback).length > 0;
+}

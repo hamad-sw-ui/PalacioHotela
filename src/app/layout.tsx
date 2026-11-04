@@ -4,6 +4,7 @@ import { quoteTabIconUrl } from "@/lib/brand-logos";
 import { getSettings } from "@/lib/hotel";
 import { mergePalette } from "@/lib/quote-pdf-theme";
 import { themeVariableStyle } from "@/lib/platform-colors";
+import { hotelCity } from "@/lib/location-copy";
 import "./globals.css";
 import "./extra.css";
 import "./quote-enhancements.css";
@@ -18,10 +19,11 @@ export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSettings();
   const icon = quoteTabIconUrl(settings);
   const routed = icon ? `/icon?v=${encodeURIComponent(icon)}` : undefined;
+  const city = hotelCity(settings, "fr");
   return {
-    title: { default: "Palacio Hotel | L'art de vivre à Douala", template: "%s | Palacio Hotel" },
-    description: "Découvrez le Palacio Hotel à Douala : chambres et suites d'exception, événements, restaurant, spa et séjours sur mesure. Réservez ou demandez votre devis.",
-    keywords: ["Palacio Hotel", "hôtel Douala", "réservation hôtel", "salle de conférence Douala", "devis hôtel"],
+    title: { default: `${settings?.hotelName || "Palacio Hotel"} | L'art de vivre à ${city}`, template: `%s | ${settings?.hotelName || "Palacio Hotel"}` },
+    description: `Découvrez le ${settings?.hotelName || "Palacio Hotel"} à ${city} : chambres et suites d'exception, événements, restaurant, spa et séjours sur mesure. Réservez ou demandez votre devis.`,
+    keywords: [settings?.hotelName || "Palacio Hotel", `hôtel ${city}`, "réservation hôtel", `salle de conférence ${city}`, "devis hôtel"],
     icons: icon && routed
       ? {
           icon: [
@@ -34,8 +36,6 @@ export async function generateMetadata(): Promise<Metadata> {
       : undefined,
   };
 }
-
-export const dynamic = "force-dynamic";
 
 const cursorHydrationGuard = `
 (() => {

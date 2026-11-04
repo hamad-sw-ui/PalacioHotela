@@ -136,7 +136,7 @@ function Footer() {
           <div className="footer-col">
             <h4>{tr(locale, "Explorer", "Explore")}</h4>
             <Link href="/hebergements?accommodation">{tr(locale, "Nos hébergements", "Accommodation")}</Link>
-            <Link href="/hebergements?events">{tr(locale, "Salles & événements", "Meetings & events")}</Link>
+            <Link href="/hebergements?events">{tr(locale, "Événements", "Events")}</Link>
             <Link href="/hebergements?service">{tr(locale, "Services & loisirs", "Services & leisure")}</Link>
             <Link href="/pages/notre-histoire">{tr(locale, "Notre histoire", "Our story")}</Link>
           </div>

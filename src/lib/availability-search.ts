@@ -11,10 +11,15 @@ export function unitsNeeded(capacity: number, guests: number) {
   return Math.ceil(guests / capacity);
 }
 
+/** True when a property's total units can host every guest. */
+export function fitsCapacityWithUnits(capacity: number, units: number, guests: number) {
+  const needed = unitsNeeded(capacity, guests);
+  return needed !== null && Number.isInteger(units) && needed <= BOOKING_UNIT_LIMIT && units >= needed;
+}
+
 /** True when free stock can host every guest, using as many units as needed. */
 export function fitsGuestDemand(capacity: number, remaining: number, guests: number) {
-  const needed = unitsNeeded(capacity, guests);
-  return needed !== null && Number.isInteger(remaining) && needed <= BOOKING_UNIT_LIMIT && remaining >= needed;
+  return fitsCapacityWithUnits(capacity, remaining, guests);
 }
 
 export function availabilityHref(stay: AvailabilityStay) {
