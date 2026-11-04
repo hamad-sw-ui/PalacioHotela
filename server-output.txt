@@ -1,0 +1,8 @@
+
+> start
+> next start
+
+▲ Next.js 16.2.12
+- Local:         http://localhost:3000
+- Network:       http://192.168.4.1:3000
+✓ Ready in 1639ms

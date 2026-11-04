@@ -81,13 +81,13 @@ async function bearerToken() {
 function previewAdmin() {
   return {
     id: 0,
-    fullName: "Administrateur Palacio",
+    fullName: "Administrateur Palacio [DÉMO]",
     email: (process.env.ADMIN_EMAIL || "admin@palaciohotel.com").toLowerCase(),
     phone: null,
     country: "",
     passwordHash: null,
     googleSub: null,
-    role: "admin",
+    role: "demo",
     locale: "fr",
     active: true,
     createdAt: new Date(),
@@ -118,6 +118,19 @@ export async function getCurrentUser() {
 export async function getAdmin() {
   const user = await getCurrentUser();
   return user && (user.role === "admin" || user.role === "staff") ? user : null;
+}
+
+/**
+ * Retourne l'utilisateur autorisé à voir le backoffice : vrai admin/staff,
+ * ou le compte démo (id: 0, rôle "demo") en développement uniquement.
+ * Le compte démo ne donne jamais accès aux données de production réelles.
+ */
+export async function getBackofficeUser() {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  if (user.role === "admin" || user.role === "staff") return user;
+  if (user.id === 0 && user.role === "demo" && process.env.NODE_ENV === "development") return user;
+  return null;
 }
 
 /**

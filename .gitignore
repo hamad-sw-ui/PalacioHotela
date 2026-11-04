@@ -32,6 +32,14 @@ next-env.d.ts
 /.coda
 dev-server*.log
 
+# verification artefacts (audit)
+audit-home*.html
+audit-home*.png
+audit-final.png
+audit-chunk-*.js
+tmp-*.mjs
+*.tar
+
 test-out.txt
 tsc-check.txt
 build-log.txt

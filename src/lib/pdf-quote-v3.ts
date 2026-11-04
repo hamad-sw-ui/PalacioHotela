@@ -21,7 +21,7 @@ export async function embedAsset(pdf: PDFDocument, url: string | null | undefine
     const bytes = url.startsWith("http")
       ? new Uint8Array(await (await fetch(url)).arrayBuffer())
       : url.startsWith("/")
-        ? new Uint8Array(await readFile(join(process.cwd(), url.startsWith("/api/media/") ? `public/uploads/media/${url.slice("/api/media/".length)}` : `public${url}`)))
+        ? new Uint8Array(await readFile(join(/* turbopackIgnore: true */ process.cwd(), url.startsWith("/api/media/") ? `public/uploads/media/${url.slice("/api/media/".length)}` : `public${url}`)))
         : null;
     if (!bytes) return null;
     if (/\.png(?:\?|$)/i.test(url)) return await pdf.embedPng(bytes);

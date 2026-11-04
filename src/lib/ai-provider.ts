@@ -123,6 +123,8 @@ function localAnalyze(message: string, locale: "fr" | "en", catalog: CatalogItem
 
 export const GEMINI_OPENAI_BASE = "https://generativelanguage.googleapis.com/v1beta/openai";
 export const GEMINI_DEFAULT_MODEL = "gemini-3.8-flash";
+// Free-tier friendly alternates tried in order when the primary model is saturated.
+export const GEMINI_FALLBACK_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-flash-lite-latest"];
 
 export type AiSettings = {
   aiProvider?: string | null;
@@ -208,16 +210,21 @@ export async function probeAi(input: { settings?: AiSettings | null; env?: AiEnv
   }
   const model = ai.model || (ai.provider === "gemini" ? GEMINI_DEFAULT_MODEL : "gpt-4o-mini");
   if (!(ai.provider === "openai" || ai.provider === "gemini" || ai.provider === "auto") || !ai.key) return { configured: false, verified: false, code: "missing" as const, provider: ai.provider || "auto", model };
-  try {
-    const response = await fetchImpl(chatCompletionsUrl(ai.baseUrl, ai.provider), { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${ai.key}` }, body: JSON.stringify({ model, temperature: 0, max_tokens: ai.provider === "gemini" ? 64 : 16, ...geminiChatOptions(ai.provider, ai.baseUrl), messages: [{ role: "user", content: "Reply with OK" }] }), signal: AbortSignal.timeout(20000) });
-    if (!response.ok) return { configured: true, verified: false, code: "failed" as const, provider: ai.provider, model, error: redactAiError(`HTTP ${response.status} ${await response.text().catch(() => "")}`, ai.key) };
-    const data = await response.json() as { choices?: { message?: { content?: string } }[] };
-    const reply = redactAiError(data.choices?.[0]?.message?.content?.trim() || "", ai.key).slice(0, 120);
-    if (!reply) return { configured: true, verified: false, code: "failed" as const, provider: ai.provider, model, error: "Le service a répondu sans texte." };
-    return { configured: true, verified: true, code: "verified" as const, provider: ai.provider, model, reply };
-  } catch (error) {
-    return { configured: true, verified: false, code: "failed" as const, provider: ai.provider, model, error: redactAiError(error, ai.key) };
+  let lastError = "";
+  for (const candidate of modelCandidates(ai.provider, model)) {
+    try {
+      const response = await fetchImpl(chatCompletionsUrl(ai.baseUrl, ai.provider), { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${ai.key}` }, body: JSON.stringify({ model: candidate, temperature: 0, max_tokens: ai.provider === "gemini" ? 64 : 16, ...geminiChatOptions(ai.provider, ai.baseUrl), messages: [{ role: "user", content: "Reply with OK" }] }), signal: AbortSignal.timeout(20000) });
+      if (!response.ok) { lastError = redactAiError(`HTTP ${response.status} ${await response.text().catch(() => "")}`, ai.key); if (retryableStatus(response.status)) continue; return { configured: true, verified: false, code: "failed" as const, provider: ai.provider, model: candidate, error: lastError }; }
+      const data = await response.json() as { choices?: { message?: { content?: string } }[] };
+      const reply = redactAiError(data.choices?.[0]?.message?.content?.trim() || "", ai.key).slice(0, 120);
+      if (!reply) return { configured: true, verified: false, code: "failed" as const, provider: ai.provider, model: candidate, error: "Le service a répondu sans texte." };
+      return { configured: true, verified: true, code: "verified" as const, provider: ai.provider, model: candidate, reply };
+    } catch (error) {
+      lastError = redactAiError(error, ai.key);
+      continue;
+    }
   }
+  return { configured: true, verified: false, code: "failed" as const, provider: ai.provider, model, error: lastError || "Le service a répondu sans texte." };
 }
 
 function parseJson(content: string) {
@@ -227,13 +234,38 @@ function parseJson(content: string) {
   return JSON.parse(start >= 0 && end > start ? cleaned.slice(start, end + 1) : cleaned);
 }
 
+export function modelCandidates(provider: string, model: string) {
+  const primary = model || (provider === "gemini" ? GEMINI_DEFAULT_MODEL : provider === "openai" ? "gpt-4o-mini" : "");
+  if (provider !== "gemini" && provider !== "auto") return [primary].filter(Boolean);
+  const fallbacks = provider === "gemini" || /generativelanguage\.googleapis\.com/i.test(model) ? GEMINI_FALLBACK_MODELS : [];
+  return [...new Set([primary, ...fallbacks])].filter(Boolean);
+}
+
+const retryableStatus = (status: number) => status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+
+export async function callAiChat(messages: { role: "system" | "user" | "assistant"; content: string }[], options: { provider: string; baseUrl: string; model: string; key?: string; temperature?: number; maxTokens?: number; timeoutMs?: number; fetchImpl?: typeof fetch }) {
+  const { provider, baseUrl, key, temperature = 0.5, maxTokens = 512, timeoutMs = 20000, fetchImpl = fetch } = options;
+  if (!(provider === "openai" || provider === "gemini" || provider === "auto") || !key) return null;
+  let lastStatus = 0;
+  for (const model of modelCandidates(provider, options.model)) {
+    try {
+      const response = await fetchImpl(chatCompletionsUrl(baseUrl, provider), { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` }, body: JSON.stringify({ model, temperature, max_tokens: maxTokens, ...geminiChatOptions(provider, baseUrl), messages }), signal: AbortSignal.timeout(timeoutMs) });
+      if (!response.ok) { lastStatus = response.status; if (retryableStatus(response.status)) continue; return null; }
+      const data = await response.json() as { choices?: { message?: { content?: string } }[] };
+      const content = data.choices?.[0]?.message?.content?.trim();
+      if (content) return content;
+      return null;
+    } catch { continue; }
+  }
+  if (lastStatus) throw new Error(`AI provider returned ${lastStatus}`);
+  return null;
+}
+
 async function callRemote(messages: { role: "system" | "user"; content: string }[], provider: string, baseUrl: string, model: string, key?: string) {
   if ((provider === "openai" || provider === "gemini" || provider === "auto" && key) && key) {
-    const response = await fetch(chatCompletionsUrl(baseUrl, provider), { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` }, body: JSON.stringify({ model: model || (provider === "gemini" ? GEMINI_DEFAULT_MODEL : "gpt-4o-mini"), temperature: 0, max_tokens: 1200, ...geminiChatOptions(provider, baseUrl), response_format: { type: "json_object" }, messages }), signal: AbortSignal.timeout(20000) });
-    if (!response.ok) throw new Error(`AI provider returned ${response.status}`);
-    const data = await response.json() as { choices?: { message?: { content?: string } }[] };
-    if (!data.choices?.[0]?.message?.content) throw new Error("Empty AI response");
-    return data.choices[0].message.content;
+    const content = await callAiChat(messages, { provider, baseUrl, model, key, temperature: 0, maxTokens: 1200 });
+    if (!content) throw new Error(`AI provider unavailable for model ${model || "default"}`);
+    return content;
   }
   if (provider === "ollama" || provider === "auto" && baseUrl && !key) {
     const response = await fetch(`${baseUrl || "http://127.0.0.1:11434"}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: model || "llama3.2", stream: false, format: "json", messages }), signal: AbortSignal.timeout(12000) });

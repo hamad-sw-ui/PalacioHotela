@@ -4,11 +4,19 @@ import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
 export default defineConfig([
   // Keep the starter on the flat config export that actually runs under the pinned ESLint/Next toolchain.
   ...nextCoreWebVitals,
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
+  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", ".kilo/**"]),
   {
     // The project intentionally synchronizes browser/session state from effects in several
     // client components. Keep this compatibility rule from turning the existing UI into a
     // failed build while preserving the remaining React hooks checks.
     rules: { "react-hooks/set-state-in-effect": "off" },
+  },
+  {
+    // These client components render hotel-managed media (uploaded files served by
+    // /api/media/, logo URLs set in the backoffice, arbitrary external sources) with
+    // runtime onError fallbacks. next/image cannot optimize such unbounded hosts and
+    // would change layout/fallback behaviour, so plain <img> is intentional here.
+    files: ["src/components/**/*.tsx", "src/app/**/*.tsx"],
+    rules: { "@next/next/no-img-element": "off" },
   },
 ]);

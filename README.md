@@ -52,6 +52,19 @@ Configurer `AI_API_KEY` / `OPENAI_API_KEY` et éventuellement `AI_BASE_URL`, `AI
 
 Le backoffice permet d'importer des JPEG, PNG ou WebP (5 Mo maximum) via une route protégée. Les fichiers sont stockés localement dans `public/uploads/media/` et servis par `/api/media/`. Pour un déploiement avec stockage éphémère, raccorder cette route à un stockage persistant (S3 ou équivalent) avant production.
 
+### Déploiement sur un VPS (Ubuntu)
+
+Deux scripts sont fournis à la racine du projet :
+
+- `setup-server.sh` — installation initiale du serveur (à exécuter une seule fois, en root, après le premier transfert WinSCP) : Node.js 22, PostgreSQL (base et utilisateur créés avec mot de passe généré), PM2, Nginx en proxy inverse, HTTPS Let's Encrypt, puis premier déploiement. `sudo bash setup-server.sh votredomaine.com`.
+- `deploy.sh` — redéploiement après chaque mise à jour de fichiers : installe les dépendances seulement si `package-lock.json` a changé, applique le schéma Drizzle, rebuild Next.js, redémarre PM2 et vérifie `/api/health`. Options : `bash deploy.sh --quick` (build + redémarrage seulement), `bash deploy.sh --db` (force la mise à jour du schéma).
+
+Le cron quotidien de statut des réservations doit être planifié côté VPS, par exemple avec `crontab -e` :
+
+```
+15 1 * * * curl -s -H "Authorization: Bearer $CRON_SECRET" https://votre-domaine/api/cron/booking-status
+```
+
 ### Transfert vers une autre machine
 
 Le script PowerShell `scripts/transfer-data.ps1` sauvegarde la base PostgreSQL et les médias importés dans un dossier de transfert. Depuis la racine du projet, remplacez `E:` par la lettre de la clé USB :

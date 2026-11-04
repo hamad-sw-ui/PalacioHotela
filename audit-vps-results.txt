@@ -1,0 +1,532 @@
+AUDIT VPS PALACIO - 2026-10-31 23:19:40 - cible : root@2.24.49.223
+
+======================================================================
+== 0. CONNECTIVITE SSH
+======================================================================
+
+--- Connexion SSH + infos systeme [OK] ---
+CONNECTED
+root
+srv2108128
+Sat Oct 31 22:19:44 UTC 2026
+Linux srv2108128 7.0.0-42-generic #42-Ubuntu SMP PREEMPT_DYNAMIC Thu Oct 15 08:06:44 UTC 2026 x86_64 GNU/Linux
+ 22:19:44 up 1 day, 11:10,  6 users,  load average: 0.00, 0.00, 0.00
+
+
+======================================================================
+== 1. CONFIGURATION DRIZZLE SUR LE VPS (metadonnees non sensibles)
+======================================================================
+
+--- Configs drizzle (metadonnees) + cles .env (masquees) + historique migrations [OK] ---
+--- fichiers de config drizzle presents ---
+-rw-r--r--+ 1 root root 302 Oct 29 21:15 drizzle.config.ts
+bash: -c: line 10: syntax error near unexpected token `('
+bash: -c: line 10: ` echo ' (cle schema non detectee - non affiche: contenu potentiellement sensible)''
+aucun
+--- schema declare (valeur de la cle schema, sans les credentials) ---
+
+
+======================================================================
+== 2. BASE CIBLEE PAR LE DEPLOIEMENT (sans afficher le mot de passe)
+======================================================================
+
+--- DATABASE_URL (mot de passe masque) [OK] ---
+bash: -c: line 8: syntax error near unexpected token `(' while looking for matching `)'
+bash: -c: line 8: ` echo DATABASE_URL (format sans mot de passe) : $url'
+
+
+======================================================================
+== 3. VERSIONS ET CODE SUR LE VPS
+======================================================================
+
+--- Versions, hashes, BUILD_ID [OK] ---
+--- node / npm ---
+v22.22.1
+9.2.0
+--- pm2 ---
+7.1.1
+--- drizzle-kit / drizzle-orm / next installes ---
+--- package.json scripts ---
+--- hashes md5 (a comparer au depot local Windows, en insensible a la casse) ---
+dede83684a32ff020ffbd0474e5f4572  src/db/schema.ts
+[eval]:1
+for (const p of [drizzle-kit,drizzle-orm,next]) { try { console.log(p + = + require(p + /package.json).version) } catch (e) { console.log(p + = absent) } }
+                                                                        ^
+System.Management.Automation.RemoteException
+SyntaxError: Unexpected token '='
+    at makeContextifyScript (node:internal/vm:185:14)
+    at compileScript (node:internal/process/execution:383:10)
+    at node:internal/process/execution:447:25
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:444:60)
+    at evalFunction (node:internal/process/execution:88:30)
+    at evalScript (node:internal/process/execution:100:3)
+    at node:internal/main/eval_string:74:3
+System.Management.Automation.RemoteException
+Node.js v22.22.1
+node:internal/errors:540
+      throw error;
+      ^
+System.Management.Automation.RemoteException
+TypeError [ERR_INVALID_ARG_TYPE]: The "id" argument must be of type string. Received an instance of Object
+    at Module.require (node:internal/modules/cjs/loader:1456:3)
+    at require (node:internal/modules/helpers:147:16)
+    at [eval]:1:39
+    at runScriptInThisContext (node:internal/vm:209:10)
+    at node:internal/process/execution:446:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:444:60)
+    at evalFunction (node:internal/process/execution:88:30)
+    at evalScript (node:internal/process/execution:100:3)
+    at node:internal/main/eval_string:74:3 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+System.Management.Automation.RemoteException
+Node.js v22.22.1
+md5sum: drizzle.config.json: No such file or directory
+0ac94ef8ece1bd15050433ae8baa99c1  deploy.sh
+40a6184f6c2c243bcb4fa2f1b9d46bb8  setup-server.sh
+db1911fbf814549be83dbf74300cd522  package.json
+992f53ab6dec6486052a5937a1a02b7c  drizzle/0000_init.sql
+f045b8c13b0fda8442a8c930f6b17cfd  drizzle/0001_add_user_country.sql
+b6acee921d3408c2d89a2c4aa7e9ec2d  drizzle/0002_client_notifications.sql
+742d9160aa78df2f635eda944e73adc9  drizzle/0003_orange_misty_knight.sql
+07f7ddd74f05e87b1cf5a14919013d08  drizzle/0004_contact_reply.sql
+4ff61b66550c6f1a27e4290c8265a398  drizzle/0005_quote_theme_snapshot.sql
+fd1266f638448f44489f0d02c3175745  drizzle/0006_theme_colors.sql
+a992f8e2e60873032426db1b38b07c03  drizzle/0007_quote_logo_snapshot.sql
+43bd0e2b6a00e45dc1ff94a001d462d9  drizzle/0008_brand_logo_variants.sql
+e65718e808b9f3da67dc7eaec52c9668  drizzle/0009_quote_tertiary_logo.sql
+73ccc3f8a9d9f04ac51378957e8e6a9e  drizzle/0010_instagram_url.sql
+9878fff792a3686750948e01b2b25a58  drizzle/0011_catalog_images.sql
+d6955567b4426082f59779c88be9f940  drizzle/0012_booking_refund.sql
+f3bee2754f5b819e7c3fd27990be950c  drizzle/0013_google_sub.sql
+94b1e7363e239bdafef7c023abacc6bf  drizzle/0014_flimsy_puff_adder.sql
+6689a201f0d6a06e689a202edf4b7447  drizzle/0015_serious_the_order.sql
+39cbf2b910c9d44929c1f96b0aebf72c  drizzle/meta/0000_snapshot.json
+df4b195b36c5052e96a703e619ab62a0  drizzle/meta/0003_snapshot.json
+52c7ca9fdbc222a078b5f8e3ff309ec7  drizzle/meta/0014_snapshot.json
+ce0ed67140967ad7f6563ec069a53a04  drizzle/meta/_journal.json
+--- dernier build (chemins absolus, robustes apres tout cd eventuel) ---
+drwxr-xr-x 9 root root 4096 Oct 31 04:05 /var/www/palacio/.next
+CBPLU6jWNo1MA0G7o3ckb2026-10-31 04:05:52.148998444 +0000 /var/www/palacio/.next
+
+
+======================================================================
+== 4. PM2 - PROCESSUS EN COURS
+======================================================================
+
+--- Processus PM2, chemin execute, cwd, redemarrages [OK] ---
+--- pm2 status ---
++-------------------------------------------------------------------------------------------------------------------------------------------+
+¦ id ¦ name            ¦ namespace   ¦ version ¦ mode    ¦ pid      ¦ uptime ¦ ?    ¦ status    ¦ cpu      ¦ mem      ¦ user     ¦ watching ¦
++----+-----------------+-------------+---------+---------+----------+--------+------+-----------+----------+----------+----------+----------¦
+¦ 0  ¦ palaciohotel    ¦ default     ¦ N/A     ¦ fork    ¦ 2393     ¦ 34h    ¦ 1    ¦ online    ¦ 0%       ¦ 96.4mb   ¦ root     ¦ disabled ¦
++-------------------------------------------------------------------------------------------------------------------------------------------+
+host metrics | cpu: 1% | ram usage: 20.7% | eth0: ? 0mb/s ? 1kb/s | disk: ? 0mb/s ? 1kb/s
+--- pm2 describe palacio ---
+app palacio introuvable
+--- pm2 jlist (resume) ---
+[eval]:1
+let s=";process.stdin.on(data,d=>s+=d).on(end,()=>{try{const a=JSON.parse(s);for(const p of a){console.log(name=+p.name+ status=+p.pm2_env.status+ uptime=+new Date(p.pm2_env.pm_uptime).toISOString()+ restarts=+p.pm2_env.restart_time+ script=+p.pm2_env.pm_exec_path+ cwd=+p.pm2_env.pm_cwd+ node=+p.pm2_env.node_version)}}catch(e){console.log(jlist indisponible: +e.message)}})
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+System.Management.Automation.RemoteException
+SyntaxError: Invalid or unexpected token
+    at makeContextifyScript (node:internal/vm:185:14)
+    at compileScript (node:internal/process/execution:383:10)
+    at node:internal/process/execution:447:25
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:444:60)
+    at evalFunction (node:internal/process/execution:88:30)
+    at evalScript (node:internal/process/execution:100:3)
+    at node:internal/main/eval_string:74:3
+System.Management.Automation.RemoteException
+Node.js v22.22.1
+
+
+======================================================================
+== 5. BASES POSTGRESQL DISPONIBLES
+======================================================================
+
+--- Liste des bases (nom + taille) [OK] ---
+palacio|8726 kB
+palacio_restore_test|8393 kB
+postgres|7521 kB
+
+
+--- Version PostgreSQL [OK] ---
+PostgreSQL 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0, 64-bit
+
+
+======================================================================
+== 6. SCHEMA COMPLET DE LA BASE DE PRODUCTION
+======================================================================
+
+--- Toutes les colonnes de toutes les tables (public) [OK] ---
+activity_logs|id|integer||NO|nextval('activity_logs_id_seq'::regclass)
+activity_logs|actor_id|integer||YES|
+activity_logs|actor_name|character varying|180|NO|'Système'::character varying
+activity_logs|action|character varying|120|NO|
+activity_logs|entity|character varying|60|NO|
+activity_logs|entity_id|integer||YES|
+activity_logs|details|text||NO|''::text
+activity_logs|created_at|timestamp with time zone||NO|now()
+bookings|id|integer||NO|nextval('bookings_id_seq'::regclass)
+bookings|reference|character varying|30|YES|
+bookings|public_token|character varying|80|NO|
+bookings|user_id|integer||YES|
+bookings|item_id|integer||YES|
+bookings|item_name|character varying|200|NO|
+bookings|guest_name|character varying|180|NO|
+bookings|guest_email|character varying|255|NO|
+bookings|guest_phone|character varying|60|NO|
+bookings|locale|character varying|2|NO|'fr'::character varying
+bookings|check_in|date||NO|
+bookings|check_out|date||NO|
+bookings|guests|integer||NO|1
+bookings|quantity|integer||NO|1
+bookings|total|integer||NO|0
+bookings|notes|text||NO|''::text
+bookings|status|character varying|24|NO|'pending'::character varying
+bookings|payment_method|character varying|24|NO|'cash'::character varying
+bookings|payment_status|character varying|24|NO|'unpaid'::character varying
+bookings|payment_ref|text||YES|
+bookings|payment_amount|integer||YES|
+bookings|payment_currency|character varying|8|YES|
+bookings|created_at|timestamp with time zone||NO|now()
+bookings|updated_at|timestamp with time zone||NO|now()
+bookings|refund_ref|text||YES|
+bookings|refund_error|text||YES|
+catalog_items|id|integer||NO|nextval('catalog_items_id_seq'::regclass)
+catalog_items|slug|character varying|200|NO|
+catalog_items|category|character varying|30|NO|
+catalog_items|name_fr|character varying|200|NO|
+catalog_items|name_en|character varying|200|NO|
+catalog_items|description_fr|text||NO|''::text
+catalog_items|description_en|text||NO|''::text
+catalog_items|image|text||NO|''::text
+catalog_items|price|integer||NO|0
+catalog_items|pricing_unit|character varying|24|NO|'night'::character varying
+catalog_items|capacity|integer||NO|2
+catalog_items|inventory|integer||NO|1
+catalog_items|amenities_fr|jsonb||NO|'[]'::jsonb
+catalog_items|amenities_en|jsonb||NO|'[]'::jsonb
+catalog_items|featured|boolean||NO|false
+catalog_items|active|boolean||NO|true
+catalog_items|created_at|timestamp with time zone||NO|now()
+catalog_items|updated_at|timestamp with time zone||NO|now()
+catalog_items|images|jsonb||NO|'[]'::jsonb
+catalog_items|features|jsonb||NO|'[]'::jsonb
+contact_messages|id|integer||NO|nextval('contact_messages_id_seq'::regclass)
+contact_messages|name|character varying|180|NO|
+contact_messages|email|character varying|255|NO|
+contact_messages|phone|character varying|60|YES|
+contact_messages|subject|character varying|240|NO|
+contact_messages|message|text||NO|
+contact_messages|status|character varying|20|NO|'new'::character varying
+contact_messages|created_at|timestamp with time zone||NO|now()
+contact_messages|reply|text||YES|
+contact_messages|replied_at|timestamp with time zone||YES|
+content_pages|id|integer||NO|nextval('content_pages_id_seq'::regclass)
+content_pages|slug|character varying|160|NO|
+content_pages|title_fr|character varying|200|NO|
+content_pages|title_en|character varying|200|NO|
+content_pages|body_fr|text||NO|''::text
+content_pages|body_en|text||NO|''::text
+content_pages|image|text||NO|''::text
+content_pages|published|boolean||NO|true
+content_pages|created_at|timestamp with time zone||NO|now()
+content_pages|updated_at|timestamp with time zone||NO|now()
+notifications|user_id|integer||YES|
+notifications|id|integer||NO|nextval('notifications_id_seq'::regclass)
+notifications|type|character varying|24|NO|
+notifications|title|character varying|200|NO|
+notifications|message|text||NO|
+notifications|href|text||NO|'/admin'::text
+notifications|read|boolean||NO|false
+notifications|created_at|timestamp with time zone||NO|now()
+quote_requests|id|integer||NO|nextval('quote_requests_id_seq'::regclass)
+quote_requests|reference|character varying|30|YES|
+quote_requests|public_token|character varying|80|NO|
+quote_requests|user_id|integer||YES|
+quote_requests|guest_name|character varying|180|NO|
+quote_requests|guest_email|character varying|255|NO|
+quote_requests|guest_phone|character varying|60|NO|
+quote_requests|company|character varying|180|YES|
+quote_requests|locale|character varying|2|NO|'fr'::character varying
+quote_requests|request_kind|character varying|32|NO|'accommodation'::character varying
+quote_requests|selected_items|jsonb||NO|'[]'::jsonb
+quote_requests|check_in|date||YES|
+quote_requests|check_out|date||YES|
+quote_requests|people|integer||YES|
+quote_requests|message|text||NO|''::text
+quote_requests|budget|integer||YES|
+quote_requests|amount_ttc|integer||YES|
+quote_requests|valid_until|date||YES|
+quote_requests|status|character varying|24|NO|'new'::character varying
+quote_requests|admin_notes|text||NO|''::text
+quote_requests|created_at|timestamp with time zone||NO|now()
+quote_requests|updated_at|timestamp with time zone||NO|now()
+quote_requests|estimated_total|integer||YES|
+quote_requests|pdf_template_version|integer||NO|1
+quote_requests|admin_signature_url|text||YES|
+quote_requests|admin_signer_name|character varying|180|YES|
+quote_requests|admin_signer_role|character varying|180|YES|
+quote_requests|admin_signed_at|timestamp with time zone||YES|
+quote_requests|admin_stamp_url|text||YES|
+quote_requests|client_signature_url|text||YES|
+quote_requests|client_signer_name|character varying|180|YES|
+quote_requests|client_signed_at|timestamp with time zone||YES|
+quote_requests|client_acceptance_ip|character varying|120|YES|
+quote_requests|client_acceptance_user_agent|text||YES|
+quote_requests|terms_snapshot_fr|text||NO|''::text
+quote_requests|terms_snapshot_en|text||NO|''::text
+quote_requests|theme_snapshot|character varying|24|YES|
+quote_requests|theme_palette_snapshot|jsonb||YES|
+quote_requests|logo_snapshot|text||YES|
+quote_requests|tertiary_logo_snapshot|text||YES|
+quote_requests|header_image_url|text||YES|
+site_settings|id|integer||NO|1
+site_settings|hotel_name|character varying|180|NO|'Palacio Hotel'::character varying
+site_settings|logo_url|text||NO|''::text
+site_settings|hero_image|text||NO|'/images/palacio-hero.jpg'::text
+site_settings|hero_title_fr|text||NO|'Un séjour d’exception, à votre image.'::text
+site_settings|hero_title_en|text||NO|'An exceptional stay, made for you.'::text
+site_settings|hero_subtitle_fr|text||NO|'Au cœur de Douala, découvrez une adresse où l’élégance rencontre la chaleur de l’hospitalité.'::text
+site_settings|hero_subtitle_en|text||NO|'In the heart of Douala, discover a place where elegance meets the warmth of hospitality.'::text
+site_settings|about_fr|text||NO|'Plus qu’un hôtel, une destination. Chaque détail du Palacio est pensé pour faire de votre séjour un souvenir inoubliable.'::text
+site_settings|about_en|text||NO|'More than a hotel, a destination. Every detail at Palacio is designed to make your stay unforgettable.'::text
+site_settings|about_image|text||NO|'/images/palacio-dining.jpg'::text
+site_settings|theme|character varying|24|NO|'forest'::character varying
+site_settings|email|character varying|255|NO|'bonjour@palaciohotel.com'::character varying
+site_settings|phone|character varying|60|NO|'+237 6 99 00 00 00'::character varying
+site_settings|whatsapp|character varying|60|NO|'237699000000'::character varying
+site_settings|address_fr|text||NO|'Bonanjo, Douala, Cameroun'::text
+site_settings|address_en|text||NO|'Bonanjo, Douala, Cameroon'::text
+site_settings|latitude|double precision||NO|4.0511
+site_settings|longitude|double precision||NO|9.7679
+site_settings|accepting_quotes|boolean||NO|true
+site_settings|ai_provider|character varying|24|NO|'auto'::character varying
+site_settings|ai_base_url|text||NO|''::text
+site_settings|ai_model|character varying|120|NO|''::character varying
+site_settings|updated_at|timestamp with time zone||NO|now()
+site_settings|quote_signature_url|text||NO|''::text
+site_settings|quote_stamp_url|text||NO|''::text
+site_settings|quote_signer_name|character varying|180|NO|''::character varying
+site_settings|quote_signer_role|character varying|180|NO|''::character varying
+site_settings|quote_terms_fr|text||NO|''::text
+site_settings|quote_terms_en|text||NO|''::text
+site_settings|theme_colors|jsonb||YES|
+site_settings|secondary_logo_url|text||NO|''::text
+site_settings|tertiary_logo_url|text||NO|''::text
+site_settings|quote_logo_variant|character varying|16|NO|'primary'::character varying
+site_settings|instagram_url|text||NO|''::text
+site_settings|google_client_id|text||NO|''::text
+site_settings|google_client_secret|text||NO|''::text
+site_settings|quote_header_image_url|text||NO|''::text
+site_settings|facebook_url|text||NO|''::text
+site_settings|smtp_host|text||NO|''::text
+site_settings|smtp_port|integer||NO|587
+site_settings|smtp_secure|boolean||NO|false
+site_settings|smtp_require_tls|boolean||NO|true
+site_settings|smtp_user|text||NO|''::text
+site_settings|smtp_password|text||NO|''::text
+site_settings|smtp_from|text||NO|''::text
+site_settings|ai_api_key|text||NO|''::text
+site_settings|stripe_secret_key|text||NO|''::text
+site_settings|stripe_webhook_secret|text||NO|''::text
+site_settings|paypal_client_id|text||NO|''::text
+site_settings|paypal_client_secret|text||NO|''::text
+site_settings|paypal_env|character varying|16|NO|'sandbox'::character varying
+site_settings|paypal_xaf_per_eur|double precision||NO|655.957
+site_settings|page_hero_image|text||NO|''::text
+site_settings|gallery_image_2|text||NO|''::text
+site_settings|gallery_image_3|text||NO|''::text
+site_settings|fallback_image|text||NO|''::text
+site_settings|time_zone|character varying|64|NO|'Africa/Douala'::character varying
+site_settings|city_fr|character varying|120|NO|'Douala'::character varying
+site_settings|city_en|character varying|120|NO|'Douala'::character varying
+site_settings|country_fr|character varying|120|NO|'Cameroun'::character varying
+site_settings|country_en|character varying|120|NO|'Cameroon'::character varying
+site_settings|tagline_fr|character varying|300|NO|'Votre parenthèse d''exception à Douala'::character varying
+site_settings|tagline_en|character varying|300|NO|'Your exceptional escape in Douala'::character varying
+site_settings|footer_baseline_fr|text||NO|'Une adresse singulière, des instants inoubliables. Bienvenue chez vous, à Douala.'::text
+site_settings|footer_baseline_en|text||NO|'An extraordinary address, unforgettable moments. Welcome home in Douala.'::text
+users|id|integer||NO|nextval('users_id_seq'::regclass)
+users|full_name|character varying|180|NO|
+users|email|character varying|255|NO|
+users|phone|character varying|60|YES|
+users|country|character varying|120|NO|''::character varying
+users|password_hash|text||YES|
+users|role|character varying|20|NO|'guest'::character varying
+users|locale|character varying|2|NO|'fr'::character varying
+users|active|boolean||NO|true
+users|created_at|timestamp with time zone||NO|now()
+users|google_sub|character varying|255|YES|
+
+
+--- Tous les index [OK] ---
+activity_logs|activity_created_idx|CREATE INDEX activity_created_idx ON public.activity_logs USING btree (created_at)
+activity_logs|activity_logs_pkey|CREATE UNIQUE INDEX activity_logs_pkey ON public.activity_logs USING btree (id)
+bookings|bookings_dates_idx|CREATE INDEX bookings_dates_idx ON public.bookings USING btree (item_id, check_in, check_out)
+bookings|bookings_email_idx|CREATE INDEX bookings_email_idx ON public.bookings USING btree (guest_email)
+bookings|bookings_pkey|CREATE UNIQUE INDEX bookings_pkey ON public.bookings USING btree (id)
+bookings|bookings_public_token_unique|CREATE UNIQUE INDEX bookings_public_token_unique ON public.bookings USING btree (public_token)
+bookings|bookings_reference_unique|CREATE UNIQUE INDEX bookings_reference_unique ON public.bookings USING btree (reference)
+catalog_items|catalog_category_idx|CREATE INDEX catalog_category_idx ON public.catalog_items USING btree (category)
+catalog_items|catalog_items_pkey|CREATE UNIQUE INDEX catalog_items_pkey ON public.catalog_items USING btree (id)
+catalog_items|catalog_slug_unique|CREATE UNIQUE INDEX catalog_slug_unique ON public.catalog_items USING btree (slug)
+contact_messages|contact_messages_pkey|CREATE UNIQUE INDEX contact_messages_pkey ON public.contact_messages USING btree (id)
+content_pages|content_pages_pkey|CREATE UNIQUE INDEX content_pages_pkey ON public.content_pages USING btree (id)
+content_pages|pages_slug_unique|CREATE UNIQUE INDEX pages_slug_unique ON public.content_pages USING btree (slug)
+notifications|notifications_pkey|CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id)
+notifications|notifications_user_idx|CREATE INDEX notifications_user_idx ON public.notifications USING btree (user_id, read, created_at)
+quote_requests|quote_requests_pkey|CREATE UNIQUE INDEX quote_requests_pkey ON public.quote_requests USING btree (id)
+quote_requests|quote_requests_public_token_unique|CREATE UNIQUE INDEX quote_requests_public_token_unique ON public.quote_requests USING btree (public_token)
+quote_requests|quote_requests_reference_unique|CREATE UNIQUE INDEX quote_requests_reference_unique ON public.quote_requests USING btree (reference)
+quote_requests|quotes_email_idx|CREATE INDEX quotes_email_idx ON public.quote_requests USING btree (guest_email)
+quote_requests|quotes_status_idx|CREATE INDEX quotes_status_idx ON public.quote_requests USING btree (status)
+site_settings|site_settings_pkey|CREATE UNIQUE INDEX site_settings_pkey ON public.site_settings USING btree (id)
+users|users_email_unique|CREATE UNIQUE INDEX users_email_unique ON public.users USING btree (email)
+users|users_google_sub_unique|CREATE UNIQUE INDEX users_google_sub_unique ON public.users USING btree (google_sub)
+users|users_pkey|CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)
+
+
+--- Cles etrangeres [OK] ---
+notifications|user_id|users|id
+activity_logs|actor_id|users|id
+bookings|user_id|users|id
+bookings|item_id|catalog_items|id
+quote_requests|user_id|users|id
+
+
+--- Nombre de lignes estime par table [OK] ---
+__drizzle_migrations|2
+activity_logs|82
+bookings|0
+catalog_items|0
+contact_messages|7
+content_pages|0
+notifications|7
+quote_requests|0
+site_settings|0
+users|2
+
+
+======================================================================
+== 7. HISTORIQUE DRIZZLE (table __drizzle_migrations)
+======================================================================
+
+--- La table existe-t-elle ? (t = oui, f = non) [OK] ---
+f
+
+
+--- Contenu de l'historique (id, hash, date) [OK] ---
+ERROR:  relation "public.__drizzle_migrations" does not exist
+LINE 1: ...stamp(created_at/1000) AS applied_date, hash FROM public.__d...
+                                                             ^
+
+
+--- Interpretation (A CROISER avec sections 6 et contexte) [INFO] ---
+La table __drizzle_migrations est ABSENTE. Cela signifie uniquement que
+la base n'a jamais recu de migration via drizzle-kit migrate. CONCLUSION
+POSSIBLE mais NON AUTOMATIQUE : historique push-only.
+A confirmer en croisant :
+  1. la section 6 (structure reelle comparee a src/db/schema.ts) ;
+  2. le contexte connu : setup-server.sh (push --force || true) et
+     deploy.sh (push --force) suggÃ¨rent une construction par push ;
+  3. l'absence de table ne prejuge PAS de la correspondance structurelle :
+     une base peut avoir la bonne structure sans avoir jouÃ© 0000-0014,
+     ou une structure differente.
+Ne PAS baser une decision de baseline sur ce seul indicateur.
+
+
+======================================================================
+== 8. SAUVEGARDES DISPONIBLES (lecture seule)
+======================================================================
+
+--- Liste des sauvegardes + cron [OK] ---
+--- /var/backups/palacio ---
+total 224K
+drwx------ 2 postgres postgres 4.0K Oct 31 15:25 .
+drwxr-xr-x 3 root     root     4.0K Oct 30 06:47 ..
+-rw------- 1 postgres postgres  43K Oct 29 23:18 palacio-20261029_231806.dump
+-rw------- 1 postgres postgres  43K Oct 30 03:00 palacio-20261030_030001.dump
+-rw------- 1 postgres postgres  46K Oct 31 03:00 palacio-20261031_030001.dump
+-rw------- 1 root     root      30K Oct 29 21:45 palacio-avant-migrations.sql
+-rw------- 1 postgres postgres  47K Oct 31 15:25 palacio-pre-0017-20261031_152526.dump
+--- /root/backups ---
+dossier absent
+--- /var/backups ---
+total 1.5M
+drwxr-xr-x  3 root     root     4.0K Oct 30 06:47 .
+drwxr-xr-x 13 root     root     4.0K Oct 29 15:05 ..
+-rw-r--r--  1 root     root      40K Oct 29 12:42 alternatives.tar.0
+-rw-r--r--  1 root     root      68K Oct 29 22:32 apt.extended_states.0
+-rw-r--r--  1 root     root     7.4K Oct 29 15:20 apt.extended_states.1.gz
+-rw-r--r--  1 root     root     3.7K Oct 29 15:05 apt.extended_states.2.gz
+-rw-r--r--  1 root     root     3.4K Oct 29 12:39 apt.extended_states.3.gz
+-rw-r--r--  1 root     root        0 Oct 30 00:21 dpkg.arch.0
+-rw-r--r--  1 root     root       32 Oct 29 12:42 dpkg.arch.1.gz
+-rw-r--r--  1 root     root     1.6K Oct 29 15:20 dpkg.diversions.0
+-rw-r--r--  1 root     root      294 Oct 16 16:31 dpkg.diversions.1.gz
+-rw-r--r--  1 root     root      248 Oct 29 15:05 dpkg.statoverride.0
+-rw-r--r--  1 root     root      162 Oct 16 16:28 dpkg.statoverride.1.gz
+-rw-r--r--  1 root     root     1.2M Oct 29 22:32 dpkg.status.0
+-rw-r--r--  1 root     root     149K Oct 29 12:39 dpkg.status.1.gz
+drwx------  2 postgres postgres 4.0K Oct 31 15:25 palacio
+--- crontab root ---
+pas de crontab root (ou droits insuffisants)
+--- /etc/cron.d ---
+certbot
+e2scrub_all
+monarx-update
+palacio-backup
+
+
+======================================================================
+== 9. INTEGRITE DES SAUVEGARDES (pg_restore --list, sans restauration)
+======================================================================
+
+--- Verification pg_restore --list sur chaque .dump [OK] ---
+bash: -c: line 10: syntax error near unexpected token `('
+bash: -c: line 10: `  echo --- $f ($(du -h $f | cut -f1)) ---'
+
+
+======================================================================
+== 10. RECAPITULATIF DES HASHES A COMPARER AU DEPOT LOCAL
+======================================================================
+
+--- Hashes md5 a comparer manuellement au depot local [OK] ---
+A comparer au depot local Windows (md5sum local, insensible a la casse) :
+  src/db/schema.ts, drizzle.config.json, deploy.sh, setup-server.sh, package.json, drizzle/*.sql
+dede83684a32ff020ffbd0474e5f4572  src/db/schema.ts
+md5sum: drizzle.config.json: No such file or directory
+0ac94ef8ece1bd15050433ae8baa99c1  deploy.sh
+40a6184f6c2c243bcb4fa2f1b9d46bb8  setup-server.sh
+db1911fbf814549be83dbf74300cd522  package.json
+992f53ab6dec6486052a5937a1a02b7c  drizzle/0000_init.sql
+f045b8c13b0fda8442a8c930f6b17cfd  drizzle/0001_add_user_country.sql
+b6acee921d3408c2d89a2c4aa7e9ec2d  drizzle/0002_client_notifications.sql
+742d9160aa78df2f635eda944e73adc9  drizzle/0003_orange_misty_knight.sql
+07f7ddd74f05e87b1cf5a14919013d08  drizzle/0004_contact_reply.sql
+4ff61b66550c6f1a27e4290c8265a398  drizzle/0005_quote_theme_snapshot.sql
+fd1266f638448f44489f0d02c3175745  drizzle/0006_theme_colors.sql
+a992f8e2e60873032426db1b38b07c03  drizzle/0007_quote_logo_snapshot.sql
+43bd0e2b6a00e45dc1ff94a001d462d9  drizzle/0008_brand_logo_variants.sql
+e65718e808b9f3da67dc7eaec52c9668  drizzle/0009_quote_tertiary_logo.sql
+73ccc3f8a9d9f04ac51378957e8e6a9e  drizzle/0010_instagram_url.sql
+9878fff792a3686750948e01b2b25a58  drizzle/0011_catalog_images.sql
+d6955567b4426082f59779c88be9f940  drizzle/0012_booking_refund.sql
+f3bee2754f5b819e7c3fd27990be950c  drizzle/0013_google_sub.sql
+94b1e7363e239bdafef7c023abacc6bf  drizzle/0014_flimsy_puff_adder.sql
+6689a201f0d6a06e689a202edf4b7447  drizzle/0015_serious_the_order.sql
+39cbf2b910c9d44929c1f96b0aebf72c  drizzle/meta/0000_snapshot.json
+df4b195b36c5052e96a703e619ab62a0  drizzle/meta/0003_snapshot.json
+52c7ca9fdbc222a078b5f8e3ff309ec7  drizzle/meta/0014_snapshot.json
+ce0ed67140967ad7f6563ec069a53a04  drizzle/meta/_journal.json
+
+
+======================================================================
+== AUDIT TERMINE
+======================================================================

@@ -47,15 +47,19 @@ export async function POST(request: Request) {
     await logActivity("Connexion", "user", user.id, user.fullName, user.id);
     return Response.json({ ok: true, token, user: publicUser(user) }, { headers: noStore });
   } catch (error) {
-    // The local preview intentionally works without PostgreSQL. Keep the documented demo
-    // administrator usable in that mode, while never enabling this bypass in production
-    // or when explicit administrator credentials have been configured.
+    // The local preview intentionally works without PostgreSQL. In development
+    // ONLY, when no explicit administrator credentials are configured, a demo
+    // admin session is accepted so the UI can be exercised locally. This bypass
+    // is disabled in production and as soon as ADMIN_PASSWORD is set. No
+    // password is hardcoded here: the demo password comes from the environment
+    // or the documented local default email only gates a role-"demo" session
+    // that cannot access real backoffice data.
     const demoEmail = (process.env.ADMIN_EMAIL || "admin@palaciohotel.com").toLowerCase();
-    const demoPassword = "Palacio2026!";
+    const demoPassword = process.env.ADMIN_PASSWORD || (process.env.NODE_ENV === "development" ? "palacio-demo" : undefined);
     const bodyEmail = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
-    if (process.env.NODE_ENV === "development" && !process.env.ADMIN_PASSWORD && body?.action === "login" && bodyEmail === demoEmail && body?.password === demoPassword) {
+    if (process.env.NODE_ENV === "development" && demoPassword && body?.action === "login" && bodyEmail === demoEmail && body?.password === demoPassword) {
       const token = createSessionToken(0);
-      return Response.json({ ok: true, token, user: { id: 0, fullName: "Administrateur Palacio", email: demoEmail, role: "admin", locale: "fr" } }, { headers: noStore });
+      return Response.json({ ok: true, token, user: { id: 0, fullName: "Administrateur Palacio [DÉMO]", email: demoEmail, role: "demo", locale: "fr" } }, { headers: noStore });
     }
     console.error("[Palacio] Auth error:", error);
     return Response.json({ error: "Vérifiez les informations saisies." }, { status: 400 });

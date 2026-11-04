@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Check, Clock3, Download, FileText, Loader2, X } from "lucide-react";
 import { SignaturePad } from "@/components/signature-pad";
 import { formatXaf } from "@/lib/format";
@@ -38,7 +38,7 @@ export function AdminQuoteWindow({ token, reference, locale, onClose }: { token:
   const [signerName, setSignerName] = useState("");
   const [signature, setSignature] = useState<string | null>(null);
   const [signing, setSigning] = useState(false);
-  const L = (fr: string, en: string) => locale === "en" ? en : fr;
+  const L = useCallback((fr: string, en: string) => locale === "en" ? en : fr, [locale]);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,7 +48,7 @@ export function AdminQuoteWindow({ token, reference, locale, onClose }: { token:
       else setError(data.error || L("Devis introuvable.", "Quote not found."));
     }).catch(() => { if (!cancelled) setError(L("Impossible de charger ce devis.", "Unable to load this quote.")); });
     return () => { cancelled = true; };
-  }, [token, locale]);
+  }, [token, locale, L]);
 
   const ready = Boolean(quote && ["quote_sent", "negotiating", "accepted", "rejected", "expired"].includes(quote.status) && quote.amountTtc != null);
   const canSign = Boolean(quote && ["quote_sent", "negotiating"].includes(quote.status) && !quote.clientSignatureUrl);
