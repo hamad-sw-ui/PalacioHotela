@@ -55,8 +55,8 @@ const previewCatalog: CatalogItem[] = [
 ];
 
 const previewPages: ContentPage[] = [
-  { id: 1, slug: "notre-histoire", titleFr: "L’esprit Palacio", titleEn: "The Palacio spirit", bodyFr: `Bienvenue dans un lieu où l’hospitalité a le sens du détail.\n\nAu cœur de ${LOCATION_FALLBACKS.cityFr}, le Palacio Hotel vous accueille dans un écrin de sérénité.`, bodyEn: `Welcome to a place where hospitality lives in the details.\n\nIn the heart of ${LOCATION_FALLBACKS.cityEn}, Palacio Hotel welcomes you into a haven of serenity.`, image: "/images/palacio-hero.jpg", published: true, createdAt: new Date(), updatedAt: new Date() },
-  { id: 2, slug: "confidentialite", titleFr: "Politique de confidentialité", titleEn: "Privacy policy", bodyFr: "Vos données personnelles sont utilisées uniquement pour traiter vos demandes de réservation, de devis et vos messages.", bodyEn: "Your personal data is used only to process your booking requests, quote requests and messages.", image: "/images/palacio-hero.jpg", published: true, createdAt: new Date(), updatedAt: new Date() },
+  { id: 1, slug: "notre-histoire", pageType: "page", titleFr: "L’esprit Palacio", titleEn: "The Palacio spirit", summaryFr: "", summaryEn: "", bodyFr: `Bienvenue dans un lieu où l’hospitalité a le sens du détail.\n\nAu cœur de ${LOCATION_FALLBACKS.cityFr}, le Palacio Hotel vous accueille dans un écrin de sérénité.`, bodyEn: `Welcome to a place where hospitality lives in the details.\n\nIn the heart of ${LOCATION_FALLBACKS.cityEn}, Palacio Hotel welcomes you into a haven of serenity.`, image: "/images/palacio-hero.jpg", galleryImages: [], published: true, publishedAt: new Date(), createdAt: new Date(), updatedAt: new Date() },
+  { id: 2, slug: "confidentialite", pageType: "page", titleFr: "Politique de confidentialité", titleEn: "Privacy policy", summaryFr: "", summaryEn: "", bodyFr: "Vos données personnelles sont utilisées uniquement pour traiter vos demandes de réservation, de devis et vos messages.", bodyEn: "Your personal data is used only to process your booking requests, quote requests and messages.", image: "/images/palacio-hero.jpg", galleryImages: [], published: true, publishedAt: new Date(), createdAt: new Date(), updatedAt: new Date() },
 ];
 
 export async function getPublicPage(slug: string) {
@@ -64,7 +64,7 @@ export async function getPublicPage(slug: string) {
     async () => {
       await ensureSeeded();
       const [page] = await db.select().from(contentPages).where(and(eq(contentPages.slug, slug), eq(contentPages.published, true))).limit(1);
-      return page;
+      return page ?? null;
     },
     ["content-page", slug],
     { tags: ["pages", `page-${slug}`], revalidate: 60 },

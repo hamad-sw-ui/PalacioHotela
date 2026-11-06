@@ -7,12 +7,13 @@ import type { CatalogItem, SelectedItem } from "@/db/schema";
 import type { AdminAction, Resource } from "@/components/admin/types";
 import { authFetch } from "@/lib/client-session";
 import { normalizeCatalogFeatures, suggestedFeatures, type CatalogFeature } from "@/lib/catalog-features";
+import { CONTENT_BODY_MAX_LENGTH, CONTENT_SUMMARY_MAX_LENGTH, normalizeContentSlug } from "@/lib/content-pages";
 
 type Props = { resource: Resource; record: Record<string, unknown> | null; catalog: CatalogItem[]; locale: "fr" | "en"; onAction: AdminAction; onClose: () => void; onOpenClientPage?: (token: string) => void; quoteSignatureUrl?: string; quoteSignerName?: string };
 
 const defaults: Record<string, Record<string, unknown>> = {
   catalog: { slug: "", category: "accommodation", nameFr: "", nameEn: "", descriptionFr: "", descriptionEn: "", image: "", images: [], price: 0, pricingUnit: "night", capacity: 2, inventory: 1, amenitiesFr: [], amenitiesEn: [], features: suggestedFeatures("accommodation"), active: true, featured: false },
-  pages: { slug: "", titleFr: "", titleEn: "", bodyFr: "", bodyEn: "", image: "", published: true },
+  pages: { slug: "", pageType: "page", titleFr: "", titleEn: "", summaryFr: "", summaryEn: "", bodyFr: "", bodyEn: "", image: "", galleryImages: [], published: true, publishedAt: "" },
   users: { fullName: "", email: "", country: "", phone: "", role: "guest", locale: "fr", active: true, password: "" },
   bookings: { itemId: "", guestName: "", guestEmail: "", guestPhone: "", checkIn: "", checkOut: "", guests: 2, quantity: 1, notes: "", locale: "fr", paymentMethod: "cash", paymentStatus: "pay_on_site", status: "pending" },
   quotes: { guestName: "", guestEmail: "", guestPhone: "", company: "", locale: "fr", requestKind: "accommodation", checkIn: "", checkOut: "", people: 2, message: "", budget: "", amountTtc: "", validUntil: "", status: "new", adminNotes: "", selectedItems: [] },
@@ -20,7 +21,7 @@ const defaults: Record<string, Record<string, unknown>> = {
 };
 const editable: Record<string, string[]> = {
   catalog: ["slug", "category", "nameFr", "nameEn", "descriptionFr", "descriptionEn", "image", "images", "price", "pricingUnit", "capacity", "inventory", "amenitiesFr", "amenitiesEn", "features", "featured", "active"],
-  pages: ["slug", "titleFr", "titleEn", "bodyFr", "bodyEn", "image", "published"],
+  pages: ["slug", "pageType", "titleFr", "titleEn", "summaryFr", "summaryEn", "bodyFr", "bodyEn", "image", "galleryImages", "published", "publishedAt"],
   users: ["fullName", "email", "country", "phone", "role", "locale", "active", "password"],
   bookings: ["itemId", "guestName", "guestEmail", "guestPhone", "locale", "checkIn", "checkOut", "guests", "quantity", "notes", "status", "paymentMethod", "paymentStatus"],
   quotes: ["guestName", "guestEmail", "guestPhone", "company", "locale", "requestKind", "checkIn", "checkOut", "people", "message", "budget", "amountTtc", "validUntil", "status", "adminNotes", "selectedItems"],
@@ -31,13 +32,78 @@ type EditorValue = { form: Record<string, unknown>; change: (key: string, value:
 const EditorContext = createContext<EditorValue | null>(null);
 function useEditorValue() { const value = useContext(EditorContext); if (!value) throw new Error("Editor context missing"); return value; }
 
-function Field({ name, label, type = "text", required = false, placeholder = "", options, full = false, min }: { name: string; label: string; type?: string; required?: boolean; placeholder?: string; options?: [string, string][]; full?: boolean; min?: number }) {
+function Field({ name, label, type = "text", required = false, placeholder = "", options, full = false, min, maxLength }: { name: string; label: string; type?: string; required?: boolean; placeholder?: string; options?: [string, string][]; full?: boolean; min?: number; maxLength?: number }) {
   const { form, change } = useEditorValue();
   const value = form[name] == null ? "" : String(form[name]);
-  return <label className={`field ${full ? "full" : ""}`}><span>{label}{required ? " *" : ""}</span>{type === "textarea" ? <textarea value={value} onChange={(e) => change(name, e.target.value)} placeholder={placeholder} rows={5}/> : options ? <select value={value} onChange={(e) => change(name, e.target.value)}>{options.map(([optionValue, text]) => <option value={optionValue} key={optionValue}>{text}</option>)}</select> : <input type={type} value={value} onChange={(e) => change(name, type === "number" ? e.target.value === "" ? "" : Number(e.target.value) : e.target.value)} required={required} placeholder={placeholder} min={min}/>}</label>;
+  const { locale } = useEditorValue();
+  return <label className={`field ${full ? "full" : ""}`}><span>{label}{required ? " *" : ""}</span>{type === "textarea" ? <><textarea value={value} onChange={(e) => change(name, e.target.value)} placeholder={placeholder} rows={5} maxLength={maxLength}/>{maxLength && <small className="admin-character-count">{value.length.toLocaleString(locale)} / {maxLength.toLocaleString(locale)}</small>}</> : options ? <select value={value} onChange={(e) => change(name, e.target.value)}>{options.map(([optionValue, text]) => <option value={optionValue} key={optionValue}>{text}</option>)}</select> : <input type={type} value={value} onChange={(e) => change(name, type === "number" ? e.target.value === "" ? "" : Number(e.target.value) : e.target.value)} onBlur={name === "slug" ? () => change(name, normalizeContentSlug(value)) : undefined} required={required} placeholder={placeholder} min={min}/>}</label>;
 }
 function Toggle({ name, label }: { name: string; label: string }) { const { form, change } = useEditorValue(); return <label className="admin-toggle"><input type="checkbox" checked={Boolean(form[name])} onChange={(e) => change(name, e.target.checked)}/><span className="admin-toggle-track"/><strong>{label}</strong></label>; }
 function ImageField({ name, label }: { name: string; label: string }) { const { form, change, upload, uploading, locale } = useEditorValue(); const value = form[name] == null ? "" : String(form[name]); return <div className="admin-image-field"><span className="admin-field-label">{label}</span><div className="admin-image-picker">{value ? <img onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = "/images/palacio-hero.jpg"; }} src={value} alt="Aperçu"/> : <div className="admin-image-placeholder"><ImagePlus size={23}/></div>}<div><input className="admin-input" value={value} onChange={(e) => change(name, e.target.value)} placeholder="/images/photo.jpg ou https://..."/><label className="admin-upload-button"><ImagePlus size={15}/>{uploading ? locale === "en" ? "Uploading..." : "Import..." : locale === "en" ? "Upload an image" : "Importer une image"}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0], name)} hidden/></label><small>JPG, PNG, WebP · 5 Mo max</small></div></div></div>; }
+function NewsCoverField() {
+  const { form, change, upload, uploading, locale } = useEditorValue();
+  const [success, setSuccess] = useState("");
+  const value = form.image == null ? "" : String(form.image);
+  const L = (fr: string, en: string) => locale === "en" ? en : fr;
+  async function uploadCover(file: File, input: HTMLInputElement) {
+    setSuccess("");
+    const url = await upload(file, "image");
+    if (url) setSuccess(L("Couverture importée. Enregistrez l’article pour conserver la modification.", "Cover uploaded. Save the article to keep this change."));
+    input.value = "";
+  }
+  return <div className="admin-image-field news-admin-cover">
+    <span className="admin-field-label">{L("IMAGE DE COUVERTURE DE L’ARTICLE", "ARTICLE COVER IMAGE")}</span>
+    <div className="admin-image-picker">
+      {value
+        ? <img src={value} alt={L("Aperçu de la couverture de l’article", "Article cover preview")} onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = "/images/palacio-hero.jpg"; }}/>
+        : <div className="admin-image-placeholder"><ImagePlus size={23}/><span>{L("Aucune couverture", "No cover selected")}</span></div>}
+      <div>
+        <label className="field news-cover-url"><span>{L("URL DE L’IMAGE", "IMAGE URL")}</span><input className="admin-input" value={value} onChange={(event) => { change("image", event.target.value); setSuccess(""); }} placeholder="/uploads/media/photo.jpg"/></label>
+        <div className="news-cover-actions">
+          <label className="admin-upload-button"><ImagePlus size={15}/>{uploading ? L("Import en cours…", "Uploading…") : value ? L("Remplacer la couverture", "Replace cover") : L("Importer une couverture", "Upload a cover")}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const input = event.currentTarget; const file = input.files?.[0]; if (file) void uploadCover(file, input); }} hidden disabled={uploading}/></label>
+          {value && <button type="button" className="admin-danger-button" onClick={() => { change("image", ""); setSuccess(""); }}><Trash2 size={14}/>{L("Retirer", "Remove")}</button>}
+        </div>
+        <small>{L("JPEG, PNG ou WebP · 5 Mo maximum", "JPEG, PNG or WebP · 5 MB maximum")}</small>
+        {success && <p className="news-cover-success" role="status">{success}</p>}
+      </div>
+    </div>
+  </div>;
+}
+function NewsGalleryField() {
+  const { form, change, upload, uploading, locale } = useEditorValue();
+  const images = Array.isArray(form.galleryImages) ? form.galleryImages.filter((url): url is string => typeof url === "string") : [];
+  const L = (fr: string, en: string) => locale === "en" ? en : fr;
+  const setImages = (next: string[]) => change("galleryImages", next.slice(0, 8));
+  async function add(file: File, input: HTMLInputElement) {
+    const url = await upload(file);
+    if (url && !images.includes(url)) setImages([...images, url]);
+    input.value = "";
+  }
+  function move(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= images.length) return;
+    const next = [...images];
+    [next[index], next[target]] = [next[target], next[index]];
+    setImages(next);
+  }
+  return <div className="admin-gallery news-admin-gallery">
+    <span className="admin-field-label">{L("PHOTOS COMPLÉMENTAIRES", "ADDITIONAL PHOTOS")}</span>
+    <p className="admin-hint">{L("Ajoutez jusqu’à 8 photos. Elles seront affichées dans une galerie après le texte de l’article.", "Add up to 8 photos. They will appear in a gallery after the article text.")}</p>
+    {images.length > 0 && <div className="admin-gallery-list">{images.map((url, index) => <div className="admin-gallery-item" key={`${url}-${index}`}>
+      <img src={url} alt={L(`Photo complémentaire ${index + 1}`, `Additional photo ${index + 1}`)}/>
+      <div>
+        <button type="button" onClick={() => move(index, -1)} disabled={index === 0} aria-label={L("Monter la photo", "Move photo up")}><ChevronUp size={16}/></button>
+        <button type="button" onClick={() => move(index, 1)} disabled={index === images.length - 1} aria-label={L("Descendre la photo", "Move photo down")}><ChevronDown size={16}/></button>
+        <button type="button" onClick={() => setImages(images.filter((_, photoIndex) => photoIndex !== index))} aria-label={L("Retirer la photo", "Remove photo")}><Trash2 size={15}/></button>
+      </div>
+    </div>)}</div>}
+    {images.length < 8 && <label className="admin-upload-button"><ImagePlus size={15}/>{uploading ? L("Import en cours…", "Uploading…") : L("Ajouter une photo", "Add a photo")}<input type="file" accept="image/jpeg,image/png,image/webp" hidden disabled={uploading} onChange={(event) => {
+      const input = event.currentTarget;
+      const file = input.files?.[0];
+      if (file) void add(file, input);
+    }}/></label>}
+  </div>;
+}
 function FeaturesField() {
   const { form, change, locale } = useEditorValue();
   const L = (fr: string, en: string) => locale === "en" ? en : fr;
@@ -78,7 +144,15 @@ function QuoteLinesEditor({ value, onChange, catalog, locale }: { value: string;
 }
 
 export function AdminEditor({ resource, record, catalog, locale, onAction, onClose, onOpenClientPage, quoteSignatureUrl = "", quoteSignerName = "" }: Props) {
-  const [form, setForm] = useState<Record<string, unknown>>({ ...(record || defaults[resource] || {}) });
+  const [form, setForm] = useState<Record<string, unknown>>(() => {
+    const initial = { ...(record || defaults[resource] || {}) };
+    if (resource === "pages" && initial.publishedAt) {
+      initial.publishedAt = initial.publishedAt instanceof Date
+        ? initial.publishedAt.toISOString().slice(0, 10)
+        : String(initial.publishedAt).slice(0, 10);
+    }
+    return initial;
+  });
   const [selectedText, setSelectedText] = useState(JSON.stringify(record?.selectedItems || [], null, 2));
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -104,12 +178,13 @@ export function AdminEditor({ resource, record, catalog, locale, onAction, onClo
   const title: Record<string, [string, string]> = { catalog: ["prestation", "catalog item"], pages: ["page", "page"], users: ["utilisateur", "user"], bookings: ["réservation", "booking"], quotes: ["devis", "quote"], messages: ["message", "message"] };
   const [frNoun, enNoun] = title[resource] || [resource, resource];
   const noun = L(frNoun, enNoun);
-  async function upload(file: File, field?: string) { setUploading(true); setError(""); try { const payload = new FormData(); payload.append("file", file); const res = await authFetch("/api/admin/upload", { method: "POST", body: payload }); const data = await res.json(); if (!res.ok) throw new Error(data.error); if (field) change(field, data.url); return String(data.url || ""); } catch (err) { setError(err instanceof Error ? err.message : "Import impossible."); } finally { setUploading(false); } }
+  async function upload(file: File, field?: string) { setUploading(true); setError(""); try { const payload = new FormData(); payload.append("file", file); const res = await authFetch("/api/admin/upload", { method: "POST", body: payload }); const data = await res.json(); if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : L("Import impossible.", "Upload failed.")); if (typeof data.url !== "string" || !data.url) throw new Error(L("Le serveur n’a pas renvoyé l’adresse de l’image.", "The server did not return an image URL.")); if (field) change(field, data.url); return data.url; } catch (err) { setError(err instanceof Error && err.message ? err.message : L("Import impossible.", "Upload failed.")); } finally { setUploading(false); } }
   async function save(e: FormEvent) {
     e.preventDefault(); setError(""); setBusy(true);
     try {
       const data: Record<string, unknown> = {};
       for (const key of editable[resource] || []) if (key in form) data[key] = form[key];
+      if (resource === "pages" && data.publishedAt === "") data.publishedAt = null;
       if (resource === "catalog") { data.amenitiesFr = get("amenitiesFr").split(",").map((s) => s.trim()).filter(Boolean); data.amenitiesEn = get("amenitiesEn").split(",").map((s) => s.trim()).filter(Boolean); data.features = normalizeCatalogFeatures(form.features); }
       if (resource === "quotes") { data.selectedItems = JSON.parse(selectedText); for (const key of ["checkIn", "checkOut", "budget", "amountTtc", "validUntil", "company"]) if (data[key] === "") data[key] = null; if (record && data.status === record.status) delete data.status; if (!record) { delete data.status; delete data.amountTtc; delete data.validUntil; delete data.adminNotes; } }
       if (resource === "users" && !data.password) delete data.password;
@@ -117,7 +192,7 @@ export function AdminEditor({ resource, record, catalog, locale, onAction, onClo
       if (resource === "bookings" && confirmRefund) data.refundConfirmed = true;
       if (resource === "messages") { if (!record) delete data.status; else delete data.message; }
       const response = await onAction(resource, record ? "update" : "create", id || undefined, data);
-      if (response.ok) onClose(); else setError(L("Impossible d’enregistrer. Vérifiez les champs.", "Could not save. Check all fields."));
+      if (response.ok) onClose(); else setError(response.error || L("Impossible d’enregistrer. Vérifiez les champs.", "Could not save. Check all fields."));
     } catch (err) { setError(err instanceof Error ? err.message : "Données invalides."); }
     finally { setBusy(false); }
   }
@@ -125,7 +200,8 @@ export function AdminEditor({ resource, record, catalog, locale, onAction, onClo
   async function sendQuote(drawn?: string) { if (!record) return; const digitalSignature = drawn || signature; if (!quoteSignatureUrl && !digitalSignature) { setSignOpen(true); setError(L("Signez numériquement avant d’envoyer le devis.", "Draw your digital signature before sending the quote.")); return; } if (signOpen && signerName.trim().length < 2) { setError(L("Indiquez le nom du signataire.", "Enter the signatory name.")); return; } if (!confirm(L("Confirmer l’envoi du devis au client ?", "Send this quote to the guest?"))) return; setBusy(true); setError(""); const typedAmount = get("amountTtc").trim(); const typedUntil = get("validUntil").trim(); const response = await onAction("quotes", "send", id, { ...(typedAmount ? { amountTtc: Number(typedAmount) } : {}), ...(typedUntil ? { validUntil: typedUntil } : {}), adminNotes: get("adminNotes"), ...(digitalSignature ? { signature: digitalSignature, signerName, rememberSignature } : {}) }); if (response.ok) onClose(); else setError(L("Montant, date ou signature invalide.", "Invalid amount, date or signature.")); setBusy(false); }
   return <EditorContext.Provider value={{ form, change, upload, uploading, locale }}><div className="admin-modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}><div className="admin-modal" role="dialog" aria-modal="true"><div className="admin-modal-header"><div><span>{record ? L("MODIFICATION", "EDIT") : L("CRÉATION", "CREATE")}</span><h2>{record ? L(`Modifier ${noun}`, `Edit ${noun}`) : L(`Nouvelle ${noun}`, `New ${noun}`)}</h2></div><button onClick={onClose} aria-label="Fermer"><X size={20}/></button></div><form onSubmit={save} className="admin-modal-body">
     {resource === "catalog" && <><div className="admin-form-section"><h3>{L("Informations générales", "General information")}</h3><div className="form-grid"><Field name="nameFr" label="NOM FRANÇAIS" required/><Field name="nameEn" label="ENGLISH NAME" required/><Field name="slug" label="SLUG / URL" required placeholder="suite-signature"/><Field name="category" label={L("CATÉGORIE", "CATEGORY")} options={[["accommodation", L("Hébergement", "Accommodation")], ["conference_room", L("Salle de conférence", "Conference room")], ["event_hall", L("Salle de fête", "Event hall")], ["service", L("Service & loisir", "Service & leisure")], ["restaurant", L("Restaurant", "Dining")]]}/><Field name="descriptionFr" label="DESCRIPTION FRANÇAISE" type="textarea" full/><Field name="descriptionEn" label="ENGLISH DESCRIPTION" type="textarea" full/></div></div><div className="admin-form-section"><h3>{L("Tarifs & capacité", "Rates & capacity")}</h3><div className="form-grid"><Field name="price" label={L("PRIX UNITAIRE TTC (XAF)", "UNIT PRICE TTC (XAF)")} type="number" min={0}/><Field name="pricingUnit" label={L("JOUR", "DAY")} options={[["night", L("Par nuit", "Per night")], ["day", L("Par jour", "Per day")], ["person", L("Par personne", "Per person")], ["service", L("Par service", "Per service")]]}/><Field name="capacity" label={L("CAPACITÉ / UNITÉ", "CAPACITY / UNIT")} type="number" min={1}/><Field name="inventory" label={L("NOMBRE DISPONIBLE", "AVAILABLE UNITS")} type="number" min={0}/><Field name="amenitiesFr" label="ÉQUIPEMENTS FR (séparés par virgule)" full/><Field name="amenitiesEn" label="AMENITIES EN (comma separated)" full/></div><FeaturesField/><div className="admin-toggle-row"><Toggle name="featured" label={L("Mis en avant", "Featured")}/><Toggle name="active" label={L("Visible sur le site", "Visible on site")}/></div></div><div className="admin-form-section"><h3>{L("Visuel", "Image")}</h3><ImageField name="image" label={L("PHOTO DE COUVERTURE", "COVER PHOTO")}/><GalleryField/></div></>}
-    {resource === "pages" && <><div className="admin-form-section"><h3>{L("Contenu de la page", "Page content")}</h3><div className="form-grid"><Field name="slug" label="SLUG / URL" required/><Field name="titleFr" label="TITRE FRANÇAIS" required/><Field name="titleEn" label="ENGLISH TITLE" required/><div/><Field name="bodyFr" label="CONTENU FRANÇAIS" type="textarea" full/><Field name="bodyEn" label="ENGLISH CONTENT" type="textarea" full/></div><p className="admin-hint">{L("Séparez les paragraphes par une ligne vide.", "Separate paragraphs with a blank line.")}</p><Toggle name="published" label={L("Page publiée", "Page published")}/></div><div className="admin-form-section"><ImageField name="image" label={L("IMAGE DE COUVERTURE", "COVER IMAGE")}/></div></>}
+    {resource === "pages" && <><div className="admin-form-section"><h3>{L("Contenu de la page", "Page content")}</h3><div className="form-grid"><Field name="slug" label="SLUG / URL" required/><Field name="pageType" label={L("TYPE", "TYPE")} options={[["page", L("Page éditoriale", "Editorial page")], ["news", L("Actualité", "News")]]}/><Field name="titleFr" label="TITRE FRANÇAIS" required/><Field name="titleEn" label="ENGLISH TITLE" required/><Field name="summaryFr" label={L("RÉSUMÉ FR", "SUMMARY FR")} type="textarea" full maxLength={CONTENT_SUMMARY_MAX_LENGTH}/><Field name="summaryEn" label={L("RÉSUMÉ EN", "SUMMARY EN")} type="textarea" full maxLength={CONTENT_SUMMARY_MAX_LENGTH}/><Field name="publishedAt" label={L("DATE DE PUBLICATION", "PUBLISH DATE")} type="date"/><div/><Field name="bodyFr" label="CONTENU FRANÇAIS" type="textarea" full maxLength={CONTENT_BODY_MAX_LENGTH}/><Field name="bodyEn" label="ENGLISH CONTENT" type="textarea" full maxLength={CONTENT_BODY_MAX_LENGTH}/></div><p className="admin-hint">{L("Séparez les paragraphes par une ligne vide.", "Separate paragraphs with a blank line.")}</p>{form.pageType === "news" && <p className="admin-hint news-scheduling-hint">{L("Un article publié avec une date future sera programmé et visible à cette date. Une date vide reprend la date de création.", "A published article with a future date is scheduled and becomes visible on that date. If left blank, its creation date is used.")}</p>}<Toggle name="published" label={form.pageType === "news" ? L("Article publié", "Article published") : L("Page publiée", "Page published")}/></div><div className="admin-form-section">{form.pageType === "news" ? <NewsCoverField/> : <ImageField name="image" label={L("IMAGE DE COUVERTURE", "COVER IMAGE")}/>}</div></>}
+    {resource === "pages" && form.pageType === "news" && <div className="admin-form-section"><NewsGalleryField/></div>}
     {resource === "users" && <div className="admin-form-section"><h3>{L("Profil utilisateur", "User profile")}</h3><div className="form-grid"><Field name="fullName" label={L("NOM COMPLET", "FULL NAME")} required/><Field name="email" label="E-MAIL" type="email" required/><Field name="country" label={L("PAYS", "COUNTRY")}/><Field name="phone" label={L("TÉLÉPHONE", "PHONE")}/><Field name="role" label={L("RÔLE", "ROLE")} options={[["guest", L("Client", "Guest")], ["staff", L("Équipe", "Staff")], ["admin", L("Administrateur", "Administrator")]]}/><Field name="locale" label={L("LANGUE", "LANGUAGE")} options={[["fr", "Français"], ["en", "English"]]}/><Field name="password" label={record ? L("NOUVEAU MOT DE PASSE (OPTIONNEL)", "NEW PASSWORD (OPTIONAL)") : L("MOT DE PASSE", "PASSWORD")} type="password" required={!record} placeholder={L("8 caractères minimum", "8 characters minimum")}/></div><Toggle name="active" label={L("Compte actif", "Active account")}/></div>}
     {resource === "bookings" && <><div className="admin-form-section"><h3>{L("Séjour & réservation", "Stay & booking")}</h3><div className="form-grid"><Field name="itemId" label={L("PRESTATION", "ITEM")} required options={[["", L("Choisir une prestation", "Choose an item")], ...catalog.map((item) => [String(item.id), locale === "en" ? item.nameEn : item.nameFr] as [string,string])]}/><Field name="locale" label={L("LANGUE DU CLIENT", "GUEST LANGUAGE")} options={[["fr", "Français"], ["en", "English"]]}/><Field name="checkIn" label={L("DATE DE DÉBUT", "START DATE")} type="date" required/><Field name="checkOut" label={L("DATE DE FIN", "END DATE")} type="date" required/><Field name="guests" label={L("PERSONNES", "GUESTS")} type="number" min={1}/><Field name="quantity" label={L("QUANTITÉ", "QUANTITY")} type="number" min={1}/>{record && <><Field name="status" label={L("STATUT", "STATUS")} options={[["pending", L("En attente", "Pending")], ["confirmed", L("Confirmée", "Confirmed")], ["checked_in", L("Arrivé", "Checked in")], ["checked_out", L("Terminé", "Checked out")], ["cancelled", L("Annulée", "Cancelled")]]}/><Field name="paymentStatus" label={L("STATUT DU PAIEMENT", "PAYMENT STATUS")} options={[["unpaid", L("Non payé", "Unpaid")], ["pay_on_site", L("À payer sur place", "Pay on site")], ["awaiting_payment", L("Paiement en attente", "Awaiting payment")], ["paid", L("Payé", "Paid")], ["refunded", L("Remboursé", "Refunded")]]}/></>}</div>{record && (record.paymentMethod === "card" || record.paymentMethod === "paypal") && record.paymentStatus === "paid" && get("status") === "cancelled" && <div className="admin-hint">{["pending", "confirmed"].includes(String(record.status)) ? L("Enregistrer l’annulation rembourse le paiement en ligne.", "Saving this cancellation refunds the online payment.") : <>{record.refundError ? <span className="notice notice-error">{String(record.refundError)}</span> : null}<label className="admin-toggle"><input type="checkbox" checked={confirmRefund} onChange={(event) => setConfirmRefund(event.target.checked)}/><span className="admin-toggle-track"/><strong>{record.status === "cancelled" ? L("Relancer le remboursement", "Retry the refund") : L("Rembourser le paiement en ligne", "Refund the online payment")}</strong></label></>}</div>}</div><div className="admin-form-section"><h3>{L("Coordonnées du client", "Guest details")}</h3><div className="form-grid"><Field name="guestName" label={L("NOM COMPLET", "FULL NAME")} required/><Field name="guestEmail" label="E-MAIL" type="email" required/><Field name="guestPhone" label={L("TÉLÉPHONE", "PHONE")} required/><Field name="paymentMethod" label={L("MODE DE PAIEMENT", "PAYMENT METHOD")} options={[["cash", L("Espèces à l’hôtel", "Cash at hotel")], ["card", L("Carte", "Card")], ["paypal", "PayPal"]]}/><Field name="notes" label={L("NOTES", "NOTES")} type="textarea" full/></div></div></>}
     {resource === "quotes" && <><div className="admin-form-section"><h3>{L("Demande & client", "Request & guest")}</h3><div className="form-grid"><Field name="guestName" label={L("NOM COMPLET", "FULL NAME")} required/><Field name="guestEmail" label="E-MAIL" type="email" required/><Field name="guestPhone" label={L("TÉLÉPHONE", "PHONE")} required/><Field name="company" label={L("ENTREPRISE", "COMPANY")}/><Field name="requestKind" label={L("TYPE DE DEMANDE", "REQUEST TYPE")} options={[["accommodation", L("Hébergement", "Accommodation")], ["conference_room", L("Conférence", "Meeting")], ["event_hall", L("Salle de fête", "Event hall")], ["service", L("Service & loisir", "Service")], ["restaurant", L("Restauration", "Dining")], ["mixed", L("Mixte", "Mixed")]]}/><Field name="locale" label={L("LANGUE", "LANGUAGE")} options={[["fr", "Français"], ["en", "English"]]}/><Field name="checkIn" label={L("DATE DE DÉBUT", "START DATE")} type="date"/><Field name="checkOut" label={L("DATE DE FIN", "END DATE")} type="date"/><Field name="people" label={L("PERSONNES", "GUESTS")} type="number" min={1}/><Field name="budget" label={L("BUDGET CLIENT XAF", "GUEST BUDGET XAF")} type="number" min={0}/><Field name="message" label={L("MESSAGE DU CLIENT", "GUEST MESSAGE")} type="textarea" full required/></div></div><div className="admin-form-section"><h3>{L("Proposition commerciale", "Commercial proposal")}</h3><p className="admin-hint">{L("Montant total TTC en XAF, sans détail de TVA. Enregistrez, puis confirmez l’envoi du devis PDF.", "Total amount including tax in XAF, without VAT breakdown. Save, then send the PDF quote.")}</p><div className="form-grid"><Field name="amountTtc" label="MONTANT TOTAL TTC (XAF)" type="number" min={0}/><Field name="validUntil" label={L("VALABLE JUSQU’AU", "VALID UNTIL")} type="date"/>{record && <Field name="status" label={L("STATUT", "STATUS")} options={[["new", L("Nouveau", "New")], ["in_review", L("En étude", "In review")], ["quote_sent", L("Devis envoyé", "Quote sent")], ["negotiating", L("Négociation", "Negotiating")], ["accepted", L("Accepté", "Accepted")], ["rejected", L("Refusé", "Rejected")], ["expired", L("Expiré", "Expired")], ["cancelled", L("Annulée", "Cancelled")]]}/>}<Field name="adminNotes" label={L("NOTES / CONDITIONS POUR LE CLIENT", "NOTES / TERMS FOR GUEST")} type="textarea" full/></div></div><div className="admin-form-section"><h3>{L("Prestations sélectionnées", "Selected items")}</h3><p className="admin-hint">{L("Les noms, descriptions et prix sont resynchronisés avec le catalogue lors de l’enregistrement.", "Names, descriptions and prices are synchronized with the catalog when saving.")}</p><QuoteLinesEditor value={selectedText} onChange={setSelectedText} catalog={catalog} locale={locale}/><select className="admin-input admin-add-line" defaultValue="" onChange={(e) => { const item = catalog.find((entry) => entry.id === Number(e.target.value)); if (item) { try { const rows = JSON.parse(selectedText) as unknown[]; setSelectedText(JSON.stringify([...rows, { property_id: item.id, type: item.category, name_fr: item.nameFr, name_en: item.nameEn, description_fr: item.descriptionFr, description_en: item.descriptionEn, image: item.image, price: item.price, quantity: 1, source: "admin" }], null, 2)); } catch { setError("JSON invalide"); } } e.target.value = ""; }}><option value="">+ {L("Ajouter une prestation", "Add an item")}</option>{catalog.map((item) => <option value={item.id} key={item.id}>{locale === "en" ? item.nameEn : item.nameFr}</option>)}</select></div></>}

@@ -20,4 +20,4 @@ export type AdminData = {
 };
 export type Section = "overview" | "reservations" | "devis" | "catalogue" | "pages" | "utilisateurs" | "messages" | "notifications" | "activite" | "parametres";
 export type Resource = "bookings" | "quotes" | "catalog" | "pages" | "users" | "messages" | "settings" | "notifications";
-export type AdminAction = (resource: Resource, action: string, id?: number, data?: Record<string, unknown>) => Promise<{ ok: boolean; result?: unknown }>;
+export type AdminAction = (resource: Resource, action: string, id?: number, data?: Record<string, unknown>) => Promise<{ ok: boolean; result?: unknown; error?: string }>;

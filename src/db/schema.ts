@@ -207,12 +207,17 @@ export const quoteRequests = pgTable("quote_requests", {
 export const contentPages = pgTable("content_pages", {
   id: serial("id").primaryKey(),
   slug: varchar("slug", { length: 160 }).notNull(),
+  pageType: varchar("page_type", { length: 20 }).notNull().default("page"),
   titleFr: varchar("title_fr", { length: 200 }).notNull(),
   titleEn: varchar("title_en", { length: 200 }).notNull(),
+  summaryFr: text("summary_fr").notNull().default(""),
+  summaryEn: text("summary_en").notNull().default(""),
   bodyFr: text("body_fr").notNull().default(""),
   bodyEn: text("body_en").notNull().default(""),
   image: text("image").notNull().default(""),
+  galleryImages: jsonb("gallery_images").$type<string[]>().notNull().default([]),
   published: boolean("published").notNull().default(true),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex("pages_slug_unique").on(t.slug)]);

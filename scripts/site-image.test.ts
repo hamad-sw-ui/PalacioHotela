@@ -17,9 +17,9 @@ test("the schema carries the four site image columns with empty defaults", () =>
   for (const [camel, snake] of [["pageHeroImage", "page_hero_image"], ["galleryImage2", "gallery_image_2"], ["galleryImage3", "gallery_image_3"], ["fallbackImage", "fallback_image"]] as const) {
     assert.ok(schema.includes(`${camel}: text("${snake}").notNull().default(""),`), `${camel} column with empty default`);
   }
-  const migration = readFileSync(new URL("../src/lib/seed.ts", import.meta.url), "utf8");
+  const migration = readFileSync(new URL("../drizzle/0015_serious_the_order.sql", import.meta.url), "utf8");
   for (const column of ["page_hero_image", "gallery_image_2", "gallery_image_3", "fallback_image"]) {
-    assert.ok(migration.includes(`ADD COLUMN ${column} text NOT NULL DEFAULT ''`), `idempotent migration for ${column}`);
+    assert.ok(migration.includes(`ADD COLUMN IF NOT EXISTS "${column}" text DEFAULT '' NOT NULL`), `idempotent migration for ${column}`);
   }
 });
 
