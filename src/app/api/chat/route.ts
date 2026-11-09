@@ -13,7 +13,7 @@ function localAnswer(message: string, locale: string, items: Awaited<ReturnType<
   const opening = en ? "I’d be happy to help with that." : "Je serais ravi de vous aider avec cela.";
   const closing = en ? " Would you like to check availability or request a personalized quote?" : " Souhaitez-vous vérifier les disponibilités ou demander un devis personnalisé ?";
   const roomsIntro = en ? "Our rooms are designed for every kind of stay." : "Nos chambres sont pensées pour tous les séjours.";
-  const eventsIntro = en ? "For your conferences and celebrations, we have beautiful spaces that can be tailored to your event." : "Pour vos conférences et célébrations, nous disposons de magnifiques espaces qui s’adaptent à votre événement.";
+  const eventsIntro = en ? "For your celebrations and events, we have beautiful spaces that can be tailored to your event." : "Pour vos célébrations et événements, nous disposons de magnifiques espaces qui s’adaptent à votre événement.";
   const quoteIntro = en ? "Requesting a free personalized quote is simple." : "Demander un devis personnalisé et gratuit est simple.";
   const paymentIntro = en ? "You have several payment options available." : "Vous disposez de plusieurs options de paiement.";
   const locationIntro = en ? "You can find us here:" : "Vous pouvez nous trouver ici:";
@@ -23,7 +23,7 @@ function localAnswer(message: string, locale: string, items: Awaited<ReturnType<
     const rooms = choose("accommodation");
     return `${opening} ${roomsIntro} ${rooms.map((r) => `${en ? r.nameEn : r.nameFr} (${formatXaf(r.price, locale)}${en ? "/night" : "/nuit"})`).join(", ")}.${closing}`;
   }
-  if (/confér|sémin|meeting|conference|réunion|évén|fête|mariage|event|wedding|salle|hall/.test(lower)) {
+  if (/évén|fête|mariage|event|wedding|salle|hall|célébr/.test(lower)) {
     return `${opening} ${eventsIntro} Share your date and number of guests through our quote form, and our team will prepare a personalized proposal. Indiquez votre date et le nombre d’invités dans notre formulaire de devis : notre équipe vous préparera une offre personnalisée.`;
   }
   if (/devis|quote|estimate|proposition/.test(lower)) return `${opening} ${quoteIntro} Choose your accommodation, event space or experience, share your dates and needs, and our team will reply with a PDF quote in XAF. Choisissez votre hébergement, une salle ou un service, indiquez vos dates et vos besoins : notre équipe vous transmettra un devis PDF en XAF TTC.`;
@@ -52,12 +52,12 @@ export async function POST(request: Request) {
     const key = ai.key;
     const baseUrl = ai.baseUrl;
     const model = ai.model;
-    const context = catalog.map((item) => `${item.nameFr} / ${item.nameEn} (${item.category}): ${formatXaf(item.price)} par ${item.pricingUnit}, capacité ${item.capacity}`).join("; ");
+    const context = catalog.map((item) => `${item.nameFr} / ${item.nameEn} (${item.category}): ${formatXaf(item.price)} par ${item.pricingUnit}, capacité ${item.capacity}, stock total catalogue ${item.inventory}`).join("; ");
     const hour = new Date().getHours();
     const greeting = locale === "en"
       ? (hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening")
       : (hour < 12 ? "Bonjour" : hour < 18 ? "Bon après-midi" : "Bonsoir");
-    const system = `You are Palacio Hotel's warm, attentive bilingual concierge. Reply only in ${locale === "en" ? "English" : "French"}. Start naturally with "${greeting}". Be friendly, courteous, and genuinely helpful—like a hotel receptionist speaking to a guest in person. Use soft, welcoming language; avoid robotic lists and dry bullet points unless truly useful. Hotel: ${settings.addressFr}, ${settings.phone}, email ${settings.email}. Catalog: ${context}. Quotes are personalized, XAF TTC, final price set by hotel staff. Booking availability must be verified on the website. Never claim a booking or payment is confirmed. Encourage /devis or /reservation when appropriate. Never invent prices or availability. If you cannot help, invite the guest to contact the Palacio team directly.`;
+    const system = `You are Palacio Hotel's warm, attentive bilingual concierge. Reply only in ${locale === "en" ? "English" : "French"}. Start naturally with "${greeting}". Be friendly, courteous, and genuinely helpful—like a hotel receptionist speaking to a guest in person. Use soft, welcoming language; avoid robotic lists and dry bullet points unless truly useful. Hotel: ${settings.addressFr}, ${settings.phone}, email ${settings.email}. Catalog: ${context}. Catalog stock figures are total units only, not current or date-specific availability; never claim an item is available based on those figures. Quotes are personalized, XAF TTC, final price set by hotel staff. Booking availability must be verified on the website. Never claim a booking or payment is confirmed. Encourage /devis or /reservation when appropriate. Never invent prices or availability. If you cannot help, invite the guest to contact the Palacio team directly.`;
     if ((provider === "openai" || provider === "gemini" || provider === "auto" && key) && key) {
       try {
         const reply = await callAiChat([{ role: "system", content: system }, ...messages], { provider, baseUrl, model, key, temperature: 0.5, maxTokens: provider === "gemini" ? 512 : 280 });

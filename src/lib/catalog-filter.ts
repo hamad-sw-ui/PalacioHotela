@@ -1,7 +1,10 @@
 import type { CatalogItem } from "@/db/schema";
 
-/** Filter keys shown in the catalog toolbar, mirroring the UI tabs. */
-export const CATALOG_FILTERS = ["all", "accommodation", "conference_room", "event_hall", "service", "restaurant", "events"] as const;
+/** Filter keys shown in the catalog toolbar, mirroring the UI tabs.
+ *  "conference_room" is kept for backward-compatible URLs only; since the
+ *  retirement of the conferences section the public catalog no longer
+ *  contains that category, so the tab simply shows nothing. */
+export const CATALOG_FILTERS = ["all", "accommodation", "event_hall", "service", "restaurant", "events", "conference_room"] as const;
 export type CatalogFilter = (typeof CATALOG_FILTERS)[number];
 
 function isCatalogFilter(value: string): value is CatalogFilter {

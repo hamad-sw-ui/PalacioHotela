@@ -17,7 +17,6 @@ import {
   Sparkles,
   Trash2,
   UserRound,
-  Users,
   UtensilsCrossed,
 } from "lucide-react";
 import type { CatalogItem, SelectedItem } from "@/db/schema";
@@ -72,12 +71,6 @@ const categories = [
     fr: "Hébergements",
     en: "Accommodation",
     icon: BedDouble,
-  },
-  {
-    key: "conference_room",
-    fr: "Conférences",
-    en: "Conference rooms",
-    icon: Users,
   },
   {
     key: "event_hall",
@@ -233,7 +226,7 @@ export function QuoteClient({
   const peopleMax = cartItems.reduce(
     (sum, { line, item }) =>
       sum +
-      (["accommodation", "conference_room", "event_hall"].includes(
+      (["accommodation", "event_hall"].includes(
         item.category,
       )
         ? item.capacity * line.quantity
@@ -341,7 +334,7 @@ export function QuoteClient({
       }));
     const roomLines = cart
       .filter((line) =>
-        ["conference_room", "event_hall"].includes(
+        ["event_hall"].includes(
           items.find((item) => item.id === line.property_id)?.category || "",
         ),
       )

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ArrowUpRight, Banknote, BedDouble, CalendarDays, Check, CheckCircle2, CreditCard, Download, Info, Loader2, MessageCircle, ShieldCheck, UserRound, Users, Wallet } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Banknote, BedDouble, CalendarDays, Check, CheckCircle2, CreditCard, Download, Info, Loader2, MessageCircle, ShieldCheck, UserRound, Wallet } from "lucide-react";
 import type { CatalogItem } from "@/db/schema";
 import { BOOKING_UNIT_LIMIT, unitsNeeded } from "@/lib/availability-search";
 import { daysBetween, formatXaf, validDateRange } from "@/lib/format";
@@ -80,7 +80,6 @@ export function BookingClient({ items, config, initial, embedded = false }: { it
   const total = selected ? selected.price * quantity * (["night", "day"].includes(selected.pricingUnit) && validDateRange(checkIn, checkOut) ? daysBetween(checkIn, checkOut) : 1) : 0;
   const categories = useMemo(() => [
     { key: "accommodation", fr: "Chambres & suites", en: "Rooms & suites", icon: BedDouble },
-    { key: "conference_room", fr: "Conférences", en: "Meetings", icon: Users },
     { key: "event_hall", fr: "Salles de fête", en: "Event halls", icon: CalendarDays },
     { key: "service", fr: "Services & loisirs", en: "Services & leisure", icon: CheckCircle2 },
     { key: "restaurant", fr: "Restaurant", en: "Dining", icon: Wallet },

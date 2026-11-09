@@ -95,6 +95,7 @@ function Header() {
     { href: "/hebergements?categorie=accommodation", fr: "Hébergements", en: "Stay" },
     { href: "/hebergements?categorie=events", fr: "Événements", en: "Events" },
     { href: "/hebergements?categorie=service", fr: "Expériences", en: "Experiences" },
+    { href: "/actualites", fr: "Actualité", en: "News" },
     { href: memberHref(member === true, "/devis"), match: "/devis", fr: "Devis sur mesure", en: "Get a quote" },
     { href: "/pages/notre-histoire", fr: "Notre histoire", en: "Our story" },
   ];
@@ -136,8 +137,9 @@ function Footer() {
           <div className="footer-col">
             <h4>{tr(locale, "Explorer", "Explore")}</h4>
             <Link href="/hebergements?accommodation">{tr(locale, "Nos hébergements", "Accommodation")}</Link>
-            <Link href="/hebergements?events">{tr(locale, "Salles & événements", "Meetings & events")}</Link>
+            <Link href="/hebergements?events">{tr(locale, "Événements", "Events")}</Link>
             <Link href="/hebergements?service">{tr(locale, "Services & loisirs", "Services & leisure")}</Link>
+            <Link href="/actualites">{tr(locale, "Actualité", "News")}</Link>
             <Link href="/pages/notre-histoire">{tr(locale, "Notre histoire", "Our story")}</Link>
           </div>
           <div className="footer-col">

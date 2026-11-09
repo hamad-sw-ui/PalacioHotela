@@ -1,5 +1,7 @@
-﻿const base = "https://generativelanguage.googleapis.com/v1beta/openai";
-const key = "REDACTED_USE_ENV_GOOGLE_API_KEY";
+require("dotenv/config");
+const base = "https://generativelanguage.googleapis.com/v1beta/openai";
+const key = process.env.GOOGLE_API_KEY;
+if (!key) throw new Error("Missing GOOGLE_API_KEY; set it in the ignored .env file or environment.");
 const models = ["gemini-3.8-flash", "gemini-3.8-flash-lite", "gemini-2.5-flash-lite"];
 (async () => {
   for (const model of models) {

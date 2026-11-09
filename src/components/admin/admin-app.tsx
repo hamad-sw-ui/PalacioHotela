@@ -128,7 +128,7 @@ export function AdminApp({ onSignedOut }: { onSignedOut: () => void }) {
       if (!quietRead) setToast({ text: action === "reply" && body.result?.emailSent === false ? T("Réponse enregistrée. SMTP non configuré : l’e-mail n’a pas été envoyé.", "Reply saved. SMTP is not configured: the email was not sent.") : action === "reply" ? T("Réponse envoyée.", "Reply sent.") : action === "send" && body.result?.emailSent === false ? T("Devis publié. SMTP non configuré : envoyez le lien au client manuellement.", "Quote published. SMTP not configured: share the link manually.") : action === "bulk" && typeof body.result?.count === "number" ? T(`${body.result.count} élément(s) traité(s).${body.result.emailFailures ? ` ${body.result.emailFailures} notification(s) n’ont pas pu être envoyée(s).` : ""}`, `${body.result.count} item(s) processed.${body.result.emailFailures ? ` ${body.result.emailFailures} notification(s) could not be sent.` : ""}`) : T("Modifications enregistrées avec succès.", "Changes saved successfully.") });
       await fetchData();
       return { ok: true, result: body.result };
-    } catch (err) { setToast({ text: err instanceof Error ? err.message : "Erreur", error: true }); return { ok: false }; }
+    } catch (err) { const message = err instanceof Error ? err.message : "Erreur"; setToast({ text: message, error: true }); return { ok: false, error: message }; }
   };
   const openEditor = (resource: Resource, record?: object) => setEditor({ resource, record: record ? { ...record } as Record<string, unknown> : null });
   const [sendingQuoteId, setSendingQuoteId] = useState<number | null>(null);

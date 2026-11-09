@@ -120,6 +120,20 @@
       "when": 1793423364703,
       "tag": "0017_compatibility_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793921105763,
+      "tag": "0018_content_page_news",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793969000000,
+      "tag": "0019_content_page_news_gallery",
+      "breakpoints": true
     }
   ]
 }

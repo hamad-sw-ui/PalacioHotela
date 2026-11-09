@@ -5,8 +5,10 @@ const { Pool } = require("/var/www/palacio/node_modules/pg");
 function http(method, path, body, cookie) {
   return new Promise((resolve, reject) => {
     const data = body ? JSON.stringify(body) : null;
-    const req = require("http").request({ host: "localhost", port: 3000, path, method,
-      headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}), ...(data ? { "Content-Length": Buffer.byteLength(data) } : {}) } },
+    const req = require("http").request({
+      host: "localhost", port: 3000, path, method,
+      headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}), ...(data ? { "Content-Length": Buffer.byteLength(data) } : {}) }
+    },
       (res) => { let b = ""; res.on("data", (c) => (b += c)); res.on("end", () => resolve({ status: res.statusCode, headers: res.headers, body: b })); });
     req.on("error", reject);
     if (data) req.write(data);

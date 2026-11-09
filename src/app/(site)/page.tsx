@@ -7,5 +7,5 @@ export const revalidate = 60;
 
 export default async function HomePage() {
   const items = await getPublicCatalog();
-  return <HomeClient items={items}/>;
+  return <HomeClient items={items} />;
 }
