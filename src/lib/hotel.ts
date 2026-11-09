@@ -5,6 +5,7 @@ import { db, pool } from "@/db";
 import { activityLogs, bookings, catalogItems, contentPages, notifications, quoteRequests, siteSettings, users, type CatalogItem, type ContentPage, type SelectedItem } from "@/db/schema";
 import { demandFits, demandRanges, occupiedPeak, quoteOccupiesStock, remainingFromStays, type Stay } from "@/lib/availability";
 import { reservedPageChangeBlocked, reservedPageMessage } from "@/lib/content-pages";
+import { normalizePublicationDate } from "@/lib/news-publication";
 import { ensureSeeded } from "@/lib/seed";
 import { daysBetween } from "@/lib/format";
 import { DEFAULT_ADDRESS_EN, DEFAULT_ADDRESS_FR, DEFAULT_HERO_SUBTITLE_EN, DEFAULT_HERO_SUBTITLE_FR, DEFAULT_TIME_ZONE, LOCATION_FALLBACKS } from "@/lib/location-copy";
@@ -70,7 +71,14 @@ export async function getPublicPage(slug: string) {
     { tags: ["pages", `page-${slug}`], revalidate: 60 },
   );
   try {
-    return await cached();
+    const page = await cached();
+    if (!page) return null;
+    return {
+      ...page,
+      publishedAt: page.publishedAt === null ? null : normalizePublicationDate(page.publishedAt, "publishedAt"),
+      createdAt: normalizePublicationDate(page.createdAt, "createdAt"),
+      updatedAt: normalizePublicationDate(page.updatedAt, "updatedAt"),
+    };
   } catch (error) {
     if (process.env.NODE_ENV !== "development") throw error;
     return previewPages.find((page) => page.slug === slug);

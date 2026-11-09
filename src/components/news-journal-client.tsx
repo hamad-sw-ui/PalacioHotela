@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CalendarDays, Newspaper } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, CalendarDays, ChevronLeft, ChevronRight, Newspaper, X } from "lucide-react";
 import type { ContentPage } from "@/db/schema";
 import { useSite, tr } from "@/components/site-shell";
 import { newsDisplayDate } from "@/lib/news-publication";
@@ -118,6 +119,71 @@ export function NewsArticle({ page }: { page: ContentPage }) {
   const paragraphs = copy.body.split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter(Boolean);
   const L = (fr: string, en: string) => tr(locale, fr, en);
   const cover = siteImage(page.image, "/images/palacio-hero.jpg");
+  const galleryImages = page.galleryImages.map((image) => siteImage(image, "/images/palacio-hero.jpg"));
+  const [activeImageIndex, setActiveImageIndex] = useState<number | null>(null);
+  const activeImageIndexRef = useRef(activeImageIndex);
+  const lightboxRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
+  const galleryButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const isLightboxOpen = activeImageIndex !== null;
+
+  useEffect(() => {
+    activeImageIndexRef.current = activeImageIndex;
+  }, [activeImageIndex]);
+
+  useEffect(() => {
+    if (!isLightboxOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeButtonRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const currentIndex = activeImageIndexRef.current;
+      if (currentIndex === null) return;
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setActiveImageIndex(null);
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        setActiveImageIndex((currentIndex - 1 + galleryImages.length) % galleryImages.length);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        setActiveImageIndex((currentIndex + 1) % galleryImages.length);
+      } else if (event.key === "Tab") {
+        const focusableButtons = lightboxRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)");
+        if (!focusableButtons?.length) return;
+        const firstButton = focusableButtons[0];
+        const lastButton = focusableButtons[focusableButtons.length - 1];
+        if (!lightboxRef.current?.contains(document.activeElement)) {
+          event.preventDefault();
+          firstButton.focus();
+        } else if (event.shiftKey && document.activeElement === firstButton) {
+          event.preventDefault();
+          lastButton.focus();
+        } else if (!event.shiftKey && document.activeElement === lastButton) {
+          event.preventDefault();
+          firstButton.focus();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+      triggerButtonRef.current?.focus();
+    };
+  }, [isLightboxOpen, galleryImages.length]);
+
+  const openLightbox = (index: number) => {
+    triggerButtonRef.current = galleryButtonRefs.current[index];
+    setActiveImageIndex(index);
+  };
+  const closeLightbox = () => setActiveImageIndex(null);
+  const showPreviousImage = () => setActiveImageIndex((index) => index === null ? null : (index - 1 + galleryImages.length) % galleryImages.length);
+  const showNextImage = () => setActiveImageIndex((index) => index === null ? null : (index + 1) % galleryImages.length);
 
   return <main className="news-journal news-article">
     <div className="container news-article-wrap">
@@ -137,8 +203,25 @@ export function NewsArticle({ page }: { page: ContentPage }) {
         </header>
         <div className="news-article-body">
           {paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
-          {page.galleryImages.length > 0 && <section className="news-article-gallery" aria-label={L("Galerie de l’article", "Article photo gallery")}>
-            {page.galleryImages.map((image, index) => <figure key={`${image}-${index}`}><img src={siteImage(image, "/images/palacio-hero.jpg")} alt={`${copy.title} — ${L("photo", "photo")} ${index + 1}`} loading="lazy"/></figure>)}
+          {galleryImages.length > 0 && <section className="news-article-gallery-section" aria-label={L("Galerie de l’article", "Article photo gallery")}>
+            <header className="news-article-gallery-heading">
+              <div><p className="news-kicker">{L("EN IMAGES", "IN PICTURES")}</p><h2>{L("Les coulisses de l’histoire", "A closer look")}</h2></div>
+              <span>{String(galleryImages.length).padStart(2, "0")} {L("PHOTOS", "PHOTOS")}</span>
+            </header>
+            <div className="news-article-gallery" data-count={galleryImages.length}>
+              {galleryImages.map((image, index) => <figure key={`${image}-${index}`}>
+                <button
+                  className="news-article-gallery-image"
+                  type="button"
+                  ref={(element) => { galleryButtonRefs.current[index] = element; }}
+                  onClick={() => openLightbox(index)}
+                  aria-label={`${L("Ouvrir la photo", "Open photo")} ${index + 1} ${L("sur", "of")} ${galleryImages.length}`}
+                >
+                  <img src={image} alt={`${copy.title} — ${L("photo", "photo")} ${index + 1}`} loading="lazy"/>
+                  <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                </button>
+              </figure>)}
+            </div>
           </section>}
           <aside className="news-contact-cta">
             <div><span className="news-kicker">{L("VOTRE PROCHAIN SÉJOUR", "YOUR NEXT STAY")}</span><h2>{L("L’hospitalité du Palacio vous attend.", "Palacio hospitality is waiting for you.")}</h2></div>
@@ -148,5 +231,23 @@ export function NewsArticle({ page }: { page: ContentPage }) {
         </div>
       </article>
     </div>
+    {activeImageIndex !== null && <div
+      className="news-lightbox"
+      ref={lightboxRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={L("Visionneuse de photos", "Photo viewer")}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) closeLightbox();
+      }}
+    >
+      <button className="news-lightbox-close" type="button" ref={closeButtonRef} onClick={closeLightbox} aria-label={L("Fermer la photo", "Close photo viewer")}><X size={23}/></button>
+      <button className="news-lightbox-nav news-lightbox-previous" type="button" onClick={showPreviousImage} disabled={galleryImages.length < 2} aria-label={L("Photo précédente", "Previous photo")}><ChevronLeft size={28}/></button>
+      <figure className="news-lightbox-figure">
+        <img src={galleryImages[activeImageIndex]} alt={`${copy.title} — ${L("photo", "photo")} ${activeImageIndex + 1}`}/>
+        <figcaption aria-live="polite">{copy.title}<span>{String(activeImageIndex + 1).padStart(2, "0")} / {String(galleryImages.length).padStart(2, "0")}</span></figcaption>
+      </figure>
+      <button className="news-lightbox-nav news-lightbox-next" type="button" onClick={showNextImage} disabled={galleryImages.length < 2} aria-label={L("Photo suivante", "Next photo")}><ChevronRight size={28}/></button>
+    </div>}
   </main>;
 }

@@ -24,3 +24,19 @@ test("public news sorts by publication date with createdAt as the legacy fallbac
 
   assert.deepEqual(publicNewsOrder([old, scheduled, recent], now).map((item) => item.id), [2, 1]);
 });
+
+test("cached ISO date strings are normalized and retain publication behavior", () => {
+  const cachedNews = {
+    published: true,
+    publishedAt: "2026-11-06T10:00:00.000Z",
+    createdAt: "2026-11-05T10:00:00.000Z",
+  };
+
+  assert.equal(isPublicNews(cachedNews, now), true);
+  assert.equal(newsDisplayDate(cachedNews).toISOString(), "2026-11-06T10:00:00.000Z");
+  assert.equal(isPublicNews({ ...cachedNews, publishedAt: "2026-11-07T00:00:00.000Z" }, now), false);
+  assert.throws(
+    () => newsDisplayDate({ ...cachedNews, publishedAt: "not-a-date" }),
+    /Invalid publishedAt date/,
+  );
+});
